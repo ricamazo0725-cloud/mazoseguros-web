@@ -2,10 +2,15 @@
   "name": "mazoseguros-web",
   "private": true,
   "version": "1.0.0",
+  "packageManager": "pnpm@11.20.0",
   "scripts": {
+    "setup": "pnpm install",
     "dev": "pnpm --filter web dev",
-    "build": "chmod +x apps/web/node_modules/.bin/* 2>/dev/null; pnpm --filter web build",
+    "build": "find node_modules -type f -path '*/bin/esbuild' -exec chmod +x {} \\; ; npm --prefix apps/web run build",
     "preview": "pnpm --filter web preview"
+  },
+  "dependencies": {
+    "esbuild": "^0.21.5"
   },
   "engines": {
     "node": ">=20"
