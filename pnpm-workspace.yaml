@@ -1,2 +1,9 @@
 packages:
   - "apps/*"
+
+publicHoistPattern:
+  - "*"
+shamefullyHoist: true
+
+allowBuilds:
+  esbuild: true
