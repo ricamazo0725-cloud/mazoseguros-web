@@ -5,5 +5,12 @@ publicHoistPattern:
   - "*"
 shamefullyHoist: true
 
+# Evita que el postinstall de esbuild se ejecute durante "pnpm install" (ahí
+# es donde falla con EACCES en este hosting, antes de que nuestro propio
+# script de build alcance a arreglar los permisos). El binario real de
+# esbuild igual queda instalado vía sus dependencias opcionales de plataforma;
+# solo se salta el paso que intenta *ejecutarlo* para autoverificarse.
+ignoreScripts: true
+
 allowBuilds:
   esbuild: true

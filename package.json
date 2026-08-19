@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "pnpm install",
     "dev": "pnpm --filter web dev",
-    "build": "find node_modules -type f -path '*/bin/esbuild' -exec chmod +x {} \\; ; npm --prefix apps/web run build",
+    "build": "find node_modules -type f \\( -path '*/bin/*' -o -path '*esbuild*/bin/*' \\) -exec chmod +x {} \\; 2>/dev/null; npm --prefix apps/web run build",
     "preview": "pnpm --filter web preview"
   },
   "dependencies": {
