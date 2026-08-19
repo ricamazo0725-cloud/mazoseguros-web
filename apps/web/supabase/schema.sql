@@ -79,11 +79,7 @@ insert into site_content (section, data) values
     "title": "Protege lo que más te importa",
     "subtitle": "Pólizas de auto, hogar, salud y obras civiles, con el respaldo de aliados como Sura, Allianz y AXA.",
     "whatsapp": "573103897969",
-<<<<<<< HEAD
     "allies": ["Sura", "Allianz", "AXA", "Previsora", "Solidaria", "Seguros del Estado"]
-=======
-    "allies": ["Sura", "Allianz", "AXA"]
->>>>>>> 9c3f116cb0b85f0b94feff6e8a65613361b17ca3
   }'::jsonb),
   ('about', '{
     "heading": "Confianza y respaldo, en cada póliza",

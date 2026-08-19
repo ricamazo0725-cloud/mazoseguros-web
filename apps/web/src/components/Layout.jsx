@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Logo from "@/components/Logo";
-<<<<<<< HEAD
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
-=======
->>>>>>> 9c3f116cb0b85f0b94feff6e8a65613361b17ca3
 
 const NAV = [
   { to: "/#seguros", label: "Seguros" },
@@ -53,11 +50,8 @@ export default function Layout({ children }) {
 
       <main className="flex-1">{children}</main>
 
-<<<<<<< HEAD
       <FloatingWhatsApp />
 
-=======
->>>>>>> 9c3f116cb0b85f0b94feff6e8a65613361b17ca3
       <footer className="bg-primary text-primary-foreground">
         <div className="max-w-6xl mx-auto px-6 py-14 grid sm:grid-cols-3 gap-10">
           <div>

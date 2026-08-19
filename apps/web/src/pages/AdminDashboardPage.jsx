@@ -142,7 +142,6 @@ function ContentEditor() {
           value={hero.whatsapp}
           onChange={(v) => setHero({ ...hero, whatsapp: v })}
         />
-<<<<<<< HEAD
         <Field
           label="Aliados (uno por línea)"
           value={(hero.allies || []).join("\n")}
@@ -150,8 +149,6 @@ function ContentEditor() {
           textarea
           rows={4}
         />
-=======
->>>>>>> 9c3f116cb0b85f0b94feff6e8a65613361b17ca3
         <SaveButton onClick={() => save("hero", hero)} />
       </section>
 
@@ -204,7 +201,6 @@ function MediaEditor() {
   }
 
   return (
-<<<<<<< HEAD
     <section className="doc-card p-6 space-y-8">
       <div className="flex items-center justify-between">
         <h2 className="font-display font-semibold text-lg">Imágenes del sitio</h2>
@@ -218,15 +214,6 @@ function MediaEditor() {
       />
       <ImageField
         label="Foto de fondo del hero (opcional — sin foto se ve el fondo crema liso)"
-=======
-    <section className="doc-card p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display font-semibold text-lg">Fondo del hero</h2>
-        {saved && <span className="text-xs text-accent font-mono">Guardado ✓</span>}
-      </div>
-      <ImageField
-        label="Foto de fondo (opcional — sin foto se ve el fondo crema liso)"
->>>>>>> 9c3f116cb0b85f0b94feff6e8a65613361b17ca3
         value={media.heroBg}
         folder="hero"
         onChange={(url) => save({ ...media, heroBg: url })}
