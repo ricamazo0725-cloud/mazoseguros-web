@@ -2,10 +2,7 @@
   "name": "mazoseguros-web",
   "private": true,
   "version": "1.0.0",
-<<<<<<< HEAD
   "packageManager": "pnpm@10.5.0",
-=======
->>>>>>> 9c3f116cb0b85f0b94feff6e8a65613361b17ca3
   "scripts": {
     "dev": "pnpm --filter web dev",
     "build": "chmod +x apps/web/node_modules/.bin/* 2>/dev/null; pnpm --filter web build",
@@ -14,8 +11,4 @@
   "engines": {
     "node": ">=20"
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 9c3f116cb0b85f0b94feff6e8a65613361b17ca3
