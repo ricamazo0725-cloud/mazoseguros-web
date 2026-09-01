@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+
+Sitemap: https://mazoseguros.com/sitemap.xml
+
+# Desacelera bots agresivos
+User-agent: MJ12bot
+Crawl-delay: 10
+
+User-agent: AhrefsBot
+Crawl-delay: 10
