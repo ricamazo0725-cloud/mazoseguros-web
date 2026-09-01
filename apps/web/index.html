@@ -1,19 +1,156 @@
 <!doctype html>
 <html lang="es">
   <head>
+    <!-- Charset y Viewport -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- SEO Básico -->
     <meta
       name="description"
-      content="Mazoseguros — Agencia de seguros en Medellín. Pólizas de auto, hogar, salud y obras civiles con aliados como Sura, Allianz y AXA."
+      content="Mazoseguros — Agencia de seguros en Medellín. Pólizas de auto, hogar, salud y obras civiles con aliados como Sura, Allianz y AXA. ¡Cotiza online!"
     />
-    <title>Mazoseguros | Agencia de Seguros en Medellín</title>
+    <meta
+      name="keywords"
+      content="seguros Medellín, seguros auto, seguros hogar, seguros salud, seguros obras civiles, agencia de seguros, cotizar seguros, Sura, Allianz, AXA"
+    />
+    <meta name="author" content="Mazoseguros" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="es" />
+    <meta name="revisit-after" content="7 days" />
+    
+    <!-- Título -->
+    <title>Mazoseguros | Agencia de Seguros en Medellín | Cotiza Ahora</title>
+
+    <!-- Open Graph (Redes Sociales) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mazoseguros.com" />
+    <meta property="og:title" content="Mazoseguros | Agencia de Seguros en Medellín" />
+    <meta
+      property="og:description"
+      content="Protegemos lo que más te importa. Seguros de auto, hogar, salud y obras civiles con los mejores aliados del mercado."
+    />
+    <meta property="og:image" content="https://mazoseguros.com/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="es_CO" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://mazoseguros.com" />
+    <meta name="twitter:title" content="Mazoseguros | Agencia de Seguros en Medellín" />
+    <meta
+      name="twitter:description"
+      content="Protegemos lo que más te importa. Seguros de auto, hogar, salud y obras civiles."
+    />
+    <meta name="twitter:image" content="https://mazoseguros.com/og-image.jpg" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://mazoseguros.com" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Google Site Verification (reemplaza con tu código) -->
+    <!-- <meta name="google-site-verification" content="tu-codigo-aqui" /> -->
+
+    <!-- Fonts Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Schema.json (JSON-LD) para SEO Local -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": "Mazoseguros",
+        "image": "https://mazoseguros.com/logo.png",
+        "description": "Agencia de seguros en Medellín especializada en pólizas de auto, hogar, salud y obras civiles",
+        "url": "https://mazoseguros.com",
+        "telephone": "+573103897969",
+        "email": "mazseguros@hotmail.com",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Calle Principal",
+          "addressLocality": "Medellín",
+          "addressRegion": "Antioquia",
+          "postalCode": "050001",
+          "addressCountry": "CO"
+        },
+        "areaServed": {
+          "@type": "City",
+          "name": "Medellín"
+        },
+        "priceRange": "$$",
+        "sameAs": [
+          "https://www.facebook.com/mazoseguros",
+          "https://www.instagram.com/mazoseguros",
+          "https://www.whatsapp.com/message/contacto"
+        ],
+        "openingHoursSpecification": [
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            "opens": "09:00",
+            "closes": "18:00"
+          },
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": "Saturday",
+            "opens": "09:00",
+            "closes": "13:00"
+          }
+        ],
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.8",
+          "ratingCount": "45"
+        }
+      }
+    </script>
+
+    <!-- Schema.json para Servicios -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "InsuranceAgency",
+        "name": "Mazoseguros",
+        "url": "https://mazoseguros.com",
+        "serviceType": ["Seguros de Automóvil", "Seguros de Hogar", "Seguros de Salud", "Seguros de Obras Civiles"],
+        "knowsAbout": [
+          "Pólizas de Auto",
+          "Pólizas de Hogar",
+          "Pólizas de Salud",
+          "Pólizas de Obras Civiles"
+        ]
+      }
+    </script>
+
+    <!-- Schema.json para Organización -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Mazoseguros",
+        "url": "https://mazoseguros.com",
+        "logo": "https://mazoseguros.com/logo.png",
+        "description": "Agencia de seguros líder en Medellín con aliados como Sura, Allianz y AXA",
+        "sameAs": [
+          "https://www.facebook.com/mazoseguros",
+          "https://www.instagram.com/mazoseguros"
+        ],
+        "contact": {
+          "@type": "ContactPoint",
+          "telephone": "+573103897969",
+          "contactType": "Customer Service"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
