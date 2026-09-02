@@ -60,16 +60,16 @@ export default function Contact({ data }) {
               <div>📱 {phone}</div>
             </div>
 
-            {/* Iframe de Google Maps */}
+            {/* Google Maps Embed - Iframe */}
             <div className="mt-6 rounded-lg overflow-hidden border border-border">
               <iframe
-                src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3976.7476339584346!2d-75.59484232346508!3d6.171364019347539!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4683280f075ecd%3A0x6c1030c7665f1b48!2sMazoseguros%20Agencia%20Seguros!5e0!3m2!1ses!2sco!4v1693513000000!5m2!1ses!2sco`}
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3966.6966329976044!2d-75.5922674!3d6.1713587!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4683280f075ecd%3A0x6c1030c7665f1b48!2sMazoseguros%20Agencia%20Seguros!5e0!3m2!1ses-419!2sco!4v1788312176658!5m2!1ses-419!2sco"
                 width="100%"
-                height="300"
+                height="400"
                 style={{ border: 0, borderRadius: "8px" }}
                 allowFullScreen=""
                 loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
+                referrerPolicy="strict-origin-when-cross-origin"
                 title="Ubicación de Mazoseguros en Google Maps"
               />
             </div>
@@ -98,7 +98,7 @@ export default function Contact({ data }) {
           <Field label="Mensaje" value={form.message} onChange={(v) => setForm({ ...form, message: v })} textarea />
 
           <button type="submit" disabled={status === "sending"} className="btn-cta w-full disabled:opacity-50">
-            {status === "sending" ? "Enviando…" : "Enviar solicitud"}
+            {status === "sending"} Enviando…" : "Enviar solicitud"}
           </button>
 
           {status === "sent" && <p className="text-xs text-accent font-mono">Solicitud enviada. Te contactaremos pronto.</p>}
