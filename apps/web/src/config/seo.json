@@ -1,0 +1,66 @@
+{
+  "name": "seo-metadata",
+  "version": "1.0.0",
+  "description": "Configuración SEO para Mazoseguros",
+  "siteUrl": "https://mazoseguros.com",
+  "siteName": "Mazoseguros",
+  "description": "Agencia de seguros en Medellín especializada en pólizas de auto, hogar, salud y obras civiles con aliados como Sura, Allianz y AXA",
+  "keywords": [
+    "seguros Medellín",
+    "seguros auto",
+    "seguros hogar",
+    "seguros salud",
+    "seguros obras civiles",
+    "agencia de seguros",
+    "cotizar seguros",
+    "Sura",
+    "Allianz",
+    "AXA"
+  ],
+  "contact": {
+    "phone": "+573103897969",
+    "email": "mazseguros@hotmail.com",
+    "whatsapp": "+573103897969"
+  },
+  "address": {
+    "street": "Calle Principal",
+    "city": "Medellín",
+    "state": "Antioquia",
+    "country": "Colombia",
+    "zipCode": "050001"
+  },
+  "socialMedia": {
+    "facebook": "https://www.facebook.com/mazoseguros",
+    "instagram": "https://www.instagram.com/mazoseguros",
+    "whatsapp": "https://wa.me/573103897969"
+  },
+  "businessHours": {
+    "weekday": {
+      "open": "09:00",
+      "close": "18:00"
+    },
+    "saturday": {
+      "open": "09:00",
+      "close": "13:00"
+    },
+    "sunday": "closed"
+  },
+  "services": [
+    {
+      "name": "Seguros de Automóvil",
+      "description": "Protege tu vehículo con pólizas integrales y flexibles"
+    },
+    {
+      "name": "Seguros de Hogar",
+      "description": "Asegura tu casa y patrimonio con cobertura completa"
+    },
+    {
+      "name": "Seguros de Salud",
+      "description": "Cuida la salud de tu familia con planes adaptados"
+    },
+    {
+      "name": "Seguros de Obras Civiles",
+      "description": "Protege tus proyectos de construcción"
+    }
+  ]
+}
