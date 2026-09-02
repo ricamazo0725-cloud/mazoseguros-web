@@ -31,16 +31,18 @@ También quedó documentado (no corregido, porque no tengo los archivos): `index
 ```bash
 cd apps/web-next
 cp .env.local.example .env.local   # y completa con tus valores reales de Supabase
-pnpm install
-pnpm dev                            # http://localhost:3000
+npm install
+npm run dev                         # http://localhost:3000
 ```
 
 Para producción:
 
 ```bash
-pnpm build
-pnpm start
+npm run build
+npm start
 ```
+
+(Este subproyecto usa `npm`, no `pnpm`, aunque el resto del monorepo sí use pnpm — ver la sección "Por qué npm y no pnpm" más abajo, es a propósito y necesario para que el deploy en Hostinger funcione.)
 
 ## Hosting: Hostinger, plan con Node.js Apps (Git integration)
 
@@ -54,14 +56,20 @@ Este proyecto usa la opción 2, así que se queda con **ISR** activo (`export co
 **Configuración a completar en hPanel** (pantalla "Despliegues" de la app de Node.js, sección de directorio/compilación):
 - **Nombre del sitio web**: `mazoseguros.com` (o el que corresponda).
 - **Directorio raíz**: `apps/web-next` — como este es un monorepo, hay que apuntar aquí en vez de `./` (la raíz del repo, que es lo que usa hoy la app existente para construir `apps/web`).
-- **Gestor de paquetes**: `pnpm` (igual que usa hoy la app existente para `apps/web` — todo el monorepo es un workspace de pnpm, `apps/web-next` incluido; ya no trae `package-lock.json`).
-- **Comando de compilación**: `pnpm run build`.
+- **Gestor de paquetes**: `npm` — ver el aviso de más abajo sobre por qué, a pesar de que el resto del monorepo usa pnpm.
+- **Comando de compilación**: `npm run build`.
 - **Directorio de salida**: `.next` (es lo que genera `next build`; a diferencia de `apps/web`, esta carpeta no se sirve directo como archivos estáticos — la usa el servidor de Node al arrancar).
 - **Archivo de entrada**: `server.js` — Hostinger necesita un script de Node real para poder mantener el proceso corriendo (no le sirve apuntar a `next start`, que es un binario de CLI). Por eso se agregó `apps/web-next/server.js`: un servidor mínimo con el patrón oficial de Next.js para despliegues custom, que solo envuelve `next()` y escucha en el puerto que Hostinger inyecte por `process.env.PORT`. `package.json` ya tiene `"start": "node server.js"` actualizado para que coincida.
 - **Variables de entorno**: `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (mismos valores que ya usan en `apps/web/.env`, ver `.env.local.example`).
 - **Versión de Node**: 20 o superior (`engines.node` en `package.json` ya lo exige).
 
 ⚠️ **Ojo con esto:** la app de Node.js que ya existe en hPanel (la que hoy sirve `mazoseguros.com`) está configurada con directorio raíz `./` y directorio de salida `dist/apps/web` — es decir, construye y sirve `apps/web` (el sitio React/Vite actual). Cambiar esos campos a los de arriba en esa MISMA app **reemplaza el sitio en producción de inmediato** en el siguiente deploy, sin período de prueba aparte. Si prefieren probar primero, la alternativa es crear una app de Node.js nueva y separada apuntando a `apps/web-next`, confirmarla funcionando (Hostinger asigna una URL propia antes de conectar el dominio), y solo después mover el dominio `mazoseguros.com` de una app a la otra.
+
+### Por qué `npm` y no `pnpm` para esta app específica (aunque el resto del monorepo use pnpm)
+
+Se probó primero con `pnpm` (consistente con `apps/web`) y el deploy dio **503 Service Unavailable** sin ningún log visible. Causa encontrada al reproducir el mismo escenario en un entorno de verificación: pnpm arma `apps/web-next/node_modules` con **symlinks que apuntan fuera de esa carpeta**, a un `node_modules` compartido en la raíz del monorepo (es justamente cómo pnpm ahorra espacio en un workspace). Eso no afecta a `apps/web` porque esa app solo necesita `node_modules` una vez, durante el build — el resultado final son archivos estáticos que no dependen de nada más. Pero `apps/web-next` corre un servidor de Node que sigue vivo y necesita resolver `node_modules` en **cada request**, indefinidamente. Si el proceso en vivo de Hostinger corre aislado a `apps/web-next` (sin el resto del monorepo alrededor, que es lo más probable dado que "Directorio raíz" apunta específicamente ahí), esos symlinks quedan rotos apenas termina el build, y el servidor truena al arrancar (`Cannot find module 'next'`) — de ahí el 503 inmediato, sin log, porque el proceso ni siquiera llega a escribir nada antes de morir.
+
+Con `npm` en vez de `pnpm`, `apps/web-next/node_modules` queda con carpetas reales (nada de symlinks hacia afuera) — verificado explícitamente borrando el `node_modules` del resto del monorepo y confirmando que el build y el arranque del servidor siguen funcionando igual, sin ninguna dependencia externa a la carpeta. Por eso se volvió a `package-lock.json` en este subproyecto, aunque `apps/web` y la raíz del monorepo se queden en pnpm sin problema — son dos cosas independientes.
 
 **Detalle técnico de `/blog/[slug]`:** `generateStaticParams()` devuelve una ruta de relleno (`__sin-articulos-publicados-aun`) cuando todavía no hay artículos publicados en Supabase, para que el build nunca falle por falta de contenido — no se linkea desde ningún lado y responde 404 real. En cuanto haya al menos un artículo publicado deja de usarse.
 
