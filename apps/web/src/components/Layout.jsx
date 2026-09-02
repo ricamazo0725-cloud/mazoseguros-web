@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Logo from "@/components/Logo";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
+import seoConfig from "@/config/seo.json";
 
 const NAV = [
   { to: "/#seguros", label: "Seguros" },
@@ -12,6 +13,7 @@ const NAV = [
 
 export default function Layout({ children }) {
   const [scrolled, setScrolled] = useState(false);
+  const whatsappNumber = seoConfig.contact.whatsapp.replace(/\D/g, "");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -38,7 +40,7 @@ export default function Layout({ children }) {
             ))}
           </nav>
           <a
-            href="https://wa.me/573103897969"
+            href={`https://wa.me/${whatsappNumber}`}
             target="_blank"
             rel="noreferrer"
             className="btn-cta text-sm py-2.5 px-4"
@@ -72,8 +74,8 @@ export default function Layout({ children }) {
           <div>
             <div className="eyebrow mb-3">Contacto</div>
             <ul className="space-y-2 text-sm text-primary-foreground/80">
-              <li>mazseguros@hotmail.com</li>
-              <li>310 389 7969</li>
+              <li>{seoConfig.contact.email}</li>
+              <li>{seoConfig.contact.phone}</li>
               <li>Medellín, Colombia</li>
             </ul>
           </div>
