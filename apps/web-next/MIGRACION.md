@@ -31,15 +31,15 @@ También quedó documentado (no corregido, porque no tengo los archivos): `index
 ```bash
 cd apps/web-next
 cp .env.local.example .env.local   # y completa con tus valores reales de Supabase
-npm install
-npm run dev                         # http://localhost:3000
+pnpm install
+pnpm dev                            # http://localhost:3000
 ```
 
 Para producción:
 
 ```bash
-npm run build
-npm start
+pnpm build
+pnpm start
 ```
 
 ## Hosting: Hostinger, plan con Node.js Apps (Git integration)
@@ -54,8 +54,8 @@ Este proyecto usa la opción 2, así que se queda con **ISR** activo (`export co
 **Configuración a completar en hPanel** (pantalla "Despliegues" de la app de Node.js, sección de directorio/compilación):
 - **Nombre del sitio web**: `mazoseguros.com` (o el que corresponda).
 - **Directorio raíz**: `apps/web-next` — como este es un monorepo, hay que apuntar aquí en vez de `./` (la raíz del repo, que es lo que usa hoy la app existente para construir `apps/web`).
-- **Gestor de paquetes**: `npm` (este subproyecto trae `package-lock.json`, no `pnpm-lock.yaml` — si el selector solo tiene `pnpm`/`npm`/`yarn`, elegir `npm`).
-- **Comando de compilación**: `npm run build`.
+- **Gestor de paquetes**: `pnpm` (igual que usa hoy la app existente para `apps/web` — todo el monorepo es un workspace de pnpm, `apps/web-next` incluido; ya no trae `package-lock.json`).
+- **Comando de compilación**: `pnpm run build`.
 - **Directorio de salida**: `.next` (es lo que genera `next build`; a diferencia de `apps/web`, esta carpeta no se sirve directo como archivos estáticos — la usa el servidor de Node al arrancar).
 - **Archivo de entrada**: `server.js` — Hostinger necesita un script de Node real para poder mantener el proceso corriendo (no le sirve apuntar a `next start`, que es un binario de CLI). Por eso se agregó `apps/web-next/server.js`: un servidor mínimo con el patrón oficial de Next.js para despliegues custom, que solo envuelve `next()` y escucha en el puerto que Hostinger inyecte por `process.env.PORT`. `package.json` ya tiene `"start": "node server.js"` actualizado para que coincida.
 - **Variables de entorno**: `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (mismos valores que ya usan en `apps/web/.env`, ver `.env.local.example`).
