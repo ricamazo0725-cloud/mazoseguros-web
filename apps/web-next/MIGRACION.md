@@ -51,13 +51,17 @@ Hostinger tiene dos integraciones de Git distintas y son fáciles de confundir:
 
 Este proyecto usa la opción 2, así que se queda con **ISR** activo (`export const revalidate = 3600` en `app/page.jsx`, `app/blog/page.jsx` y `app/blog/[slug]/page.jsx`, ya en el código) — los artículos nuevos publicados desde `/admin` aparecen solos, sin rebuild manual. `next.config.mjs` NO tiene `output: "export"` activado (queda comentado, ver ese archivo) — es justo lo que habilita el ISR.
 
-**Configuración a completar en hPanel** (Websites → Add Website → Node.js Apps → Import Git Repository):
-- Repositorio: `ricamazo0725-cloud/mazoseguros-web`, rama `main`.
-- **Directorio raíz / root directory**: como este es un monorepo, hay que apuntar a `apps/web-next` (no a la raíz del repo). La documentación de Hostinger no detalla el nombre exacto de este campo en el asistente — si al importar el repo no aparece un campo para elegir subcarpeta, avísenme y armamos una alternativa (por ejemplo una rama separada que solo tenga el contenido de `apps/web-next` en la raíz).
-- **Build command**: `npm run build` (o `npm install && npm run build` si el campo no corre install por separado).
-- **Entry file / comando de arranque**: `npm start` (usa el script `"start": "next start"` de `apps/web-next/package.json`) — si el asistente pide un archivo `.js` puntual en vez de un comando, este proyecto no trae un `server.js` custom porque no lo necesita con `next start`; si Hostinger insiste en un archivo, avísenme y agrego uno.
+**Configuración a completar en hPanel** (pantalla "Despliegues" de la app de Node.js, sección de directorio/compilación):
+- **Nombre del sitio web**: `mazoseguros.com` (o el que corresponda).
+- **Directorio raíz**: `apps/web-next` — como este es un monorepo, hay que apuntar aquí en vez de `./` (la raíz del repo, que es lo que usa hoy la app existente para construir `apps/web`).
+- **Gestor de paquetes**: `npm` (este subproyecto trae `package-lock.json`, no `pnpm-lock.yaml` — si el selector solo tiene `pnpm`/`npm`/`yarn`, elegir `npm`).
+- **Comando de compilación**: `npm run build`.
+- **Directorio de salida**: `.next` (es lo que genera `next build`; a diferencia de `apps/web`, esta carpeta no se sirve directo como archivos estáticos — la usa el servidor de Node al arrancar).
+- **Archivo de entrada**: `server.js` — Hostinger necesita un script de Node real para poder mantener el proceso corriendo (no le sirve apuntar a `next start`, que es un binario de CLI). Por eso se agregó `apps/web-next/server.js`: un servidor mínimo con el patrón oficial de Next.js para despliegues custom, que solo envuelve `next()` y escucha en el puerto que Hostinger inyecte por `process.env.PORT`. `package.json` ya tiene `"start": "node server.js"` actualizado para que coincida.
 - **Variables de entorno**: `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (mismos valores que ya usan en `apps/web/.env`, ver `.env.local.example`).
 - **Versión de Node**: 20 o superior (`engines.node` en `package.json` ya lo exige).
+
+⚠️ **Ojo con esto:** la app de Node.js que ya existe en hPanel (la que hoy sirve `mazoseguros.com`) está configurada con directorio raíz `./` y directorio de salida `dist/apps/web` — es decir, construye y sirve `apps/web` (el sitio React/Vite actual). Cambiar esos campos a los de arriba en esa MISMA app **reemplaza el sitio en producción de inmediato** en el siguiente deploy, sin período de prueba aparte. Si prefieren probar primero, la alternativa es crear una app de Node.js nueva y separada apuntando a `apps/web-next`, confirmarla funcionando (Hostinger asigna una URL propia antes de conectar el dominio), y solo después mover el dominio `mazoseguros.com` de una app a la otra.
 
 **Detalle técnico de `/blog/[slug]`:** `generateStaticParams()` devuelve una ruta de relleno (`__sin-articulos-publicados-aun`) cuando todavía no hay artículos publicados en Supabase, para que el build nunca falle por falta de contenido — no se linkea desde ningún lado y responde 404 real. En cuanto haya al menos un artículo publicado deja de usarse.
 
