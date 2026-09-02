@@ -1,0 +1,54 @@
+# ============================================================
+# Enrutamiento de React Router (SPA)
+# ============================================================
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Si el archivo o carpeta solicitado existe de verdad, sírvelo tal cual
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Si no, entrega index.html para que React Router tome el control de la ruta
+  RewriteRule ^(.*)$ /index.html [L]
+</IfModule>
+
+# ============================================================
+# Cache básico para archivos estáticos
+# ============================================================
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+</IfModule>
+
+# ============================================================
+# Encabezados de seguridad HTTP
+# ============================================================
+<IfModule mod_headers.c>
+  # Evita clickjacking
+  Header always set X-Frame-Options "SAMEORIGIN"
+  
+  # Protege contra XSS adivinando tipos de archivo
+  Header always set X-Content-Type-Options "nosniff"
+  
+  # Referrer policy estricta
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  
+  # Fuerza HTTPS
+  Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+  
+  # Opener policy
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  
+  # Desactiva permisos no usados
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+  # Política de Seguridad de Contenido (CSP)
+  # Incluye Google Maps/Places y Supabase
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'sha256-/54xvssgJMN9I72+Ws9z99RHG2X2op9hMddmSLNTrlI=' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in https://maps.googleapis.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
+</IfModule>
