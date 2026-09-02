@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { submitQuoteRequest } from "@/api/quotes";
+import seoConfig from "@/config/seo.json";
 
 export default function Contact({ data }) {
   const [form, setForm] = useState({ name: "", phone: "", category: "auto", message: "" });
   const [status, setStatus] = useState("idle");
 
-  const wa = (data?.whatsapp || "573103897969").replace(/\D/g, "");
+  const wa = (data?.whatsapp || seoConfig.contact.whatsapp).replace(/\D/g, "");
+  const mapsUrl = seoConfig.address.googleMapsUrl;
+  const phone = seoConfig.contact.phone;
+  const email = seoConfig.contact.email;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -29,18 +33,46 @@ export default function Contact({ data }) {
             Cuéntanos qué quieres proteger y te contactamos con la mejor opción entre nuestros aliados.
           </p>
 
-          <a
-            href={`https://wa.me/${wa}`}
-            target="_blank"
-            rel="noreferrer"
-            className="btn-cta inline-block"
-          >
-            Escribir por WhatsApp
-          </a>
+          <div className="space-y-4 mb-8">
+            <a
+              href={`https://wa.me/${wa}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-cta inline-block"
+            >
+              Escribir por WhatsApp
+            </a>
+            
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary inline-block ml-2"
+            >
+              📍 Ver en Google Maps
+            </a>
+          </div>
 
-          <div className="mt-8 space-y-1 text-sm text-muted font-mono">
-            {data?.email && <div>{data.email}</div>}
-            {data?.whatsapp && <div>{data.whatsapp}</div>}
+          <div className="space-y-4">
+            <div className="text-sm text-muted font-mono">
+              <div className="font-semibold text-foreground mb-2">Información de contacto:</div>
+              <div>📧 {email}</div>
+              <div>📱 {phone}</div>
+            </div>
+
+            {/* Iframe de Google Maps */}
+            <div className="mt-6 rounded-lg overflow-hidden border border-border">
+              <iframe
+                src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3976.7476339584346!2d-75.59484232346508!3d6.171364019347539!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4683280f075ecd%3A0x6c1030c7665f1b48!2sMazoseguros%20Agencia%20Seguros!5e0!3m2!1ses!2sco!4v1693513000000!5m2!1ses!2sco`}
+                width="100%"
+                height="300"
+                style={{ border: 0, borderRadius: "8px" }}
+                allowFullScreen=""
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Ubicación de Mazoseguros en Google Maps"
+              />
+            </div>
           </div>
         </div>
 
