@@ -23,11 +23,14 @@
     "whatsapp": "+573103897969"
   },
   "address": {
-    "street": "Calle Principal",
+    "street": "Medellín",
     "city": "Medellín",
     "state": "Antioquia",
     "country": "Colombia",
-    "zipCode": "050001"
+    "zipCode": "050001",
+    "latitude": 6.171364,
+    "longitude": -75.5948423,
+    "googleMapsUrl": "https://www.google.com/maps/place/Mazoseguros+Agencia+Seguros/@6.171364,-75.5948423,17z/data=!4m8!3m7!1s0x8e4683280f075ecd:0x6c1030c7665f1b48!8m2!3d6.1713587!4d-75.5922674!9m1!1b1!16s%2Fg%2F11h8l02jpd"
   },
   "socialMedia": {
     "facebook": "https://www.facebook.com/mazoseguros",
