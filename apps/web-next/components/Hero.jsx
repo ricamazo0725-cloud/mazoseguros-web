@@ -1,3 +1,5 @@
+import seoConfig from "@/config/seo.json";
+
 // Server Component — sin cambios de comportamiento frente al Hero.jsx
 // original, solo que ahora recibe sus datos ya resueltos en el servidor
 // (ver app/page.jsx) en vez de esperar un useEffect en el navegador.
@@ -29,7 +31,7 @@ export default function Hero({ data, bgImage }) {
 
         <div className="mt-10 flex flex-wrap gap-4">
           <a
-            href={`https://wa.me/${(data?.whatsapp || "573103897969").replace(/\D/g, "")}`}
+            href={`https://wa.me/${(data?.whatsapp || seoConfig.contact.whatsapp).replace(/\D/g, "")}`}
             target="_blank"
             rel="noreferrer"
             className="btn-cta"

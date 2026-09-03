@@ -1,4 +1,6 @@
-const DEFAULT_WHATSAPP = "573103897969";
+import seoConfig from "@/config/seo.json";
+
+const DEFAULT_WHATSAPP = seoConfig.contact.whatsapp;
 
 // Server Component — recibe el número ya resuelto por app/layout.jsx en vez
 // de pedirlo al navegador después del primer render (como hacía el

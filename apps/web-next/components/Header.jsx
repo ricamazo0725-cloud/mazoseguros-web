@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import seoConfig from "@/config/seo.json";
 
 const NAV = [
   { to: "/#seguros", label: "Seguros" },
@@ -16,7 +17,7 @@ const NAV = [
 // props ya llegan resueltos desde el servidor.
 export default function Header({ logoUrl, whatsapp }) {
   const [scrolled, setScrolled] = useState(false);
-  const whatsappNumber = (whatsapp || "").replace(/\D/g, "");
+  const whatsappNumber = (whatsapp || seoConfig.contact.whatsapp).replace(/\D/g, "");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);

@@ -1,8 +1,9 @@
 import CategoryIcon from "@/components/CategoryIcon";
 import { CATEGORY_ORDER, CATEGORY_DEFAULTS } from "@/lib/categoryDefaults";
+import seoConfig from "@/config/seo.json";
 
 export default function InsuranceCategories({ categories, whatsapp }) {
-  const wa = (whatsapp || "573103897969").replace(/\D/g, "");
+  const wa = (whatsapp || seoConfig.contact.whatsapp).replace(/\D/g, "");
 
   return (
     <section id="seguros" className="max-w-6xl mx-auto px-6 py-24">
