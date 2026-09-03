@@ -296,28 +296,66 @@ function slugify(text) {
     .replace(/(^-|-$)/g, "");
 }
 
+const EMPTY_POST_DRAFT = {
+  title: "",
+  slug: "",
+  excerpt: "",
+  content: "",
+  cover_image: "",
+  category: "",
+  published: true,
+};
+
 function BlogEditor() {
   const [posts, setPosts] = useState([]);
-  const [draft, setDraft] = useState({
-    title: "",
-    slug: "",
-    excerpt: "",
-    content: "",
-    cover_image: "",
-    category: "",
-    published: true,
-  });
+  const [draft, setDraft] = useState(EMPTY_POST_DRAFT);
+  // id del post que se está editando — null significa que el formulario de
+  // arriba está armando uno NUEVO. Antes no existía forma de editar un
+  // artículo ya creado (solo publicar, ocultar o eliminar); con esto el
+  // mismo formulario sirve para crear y para editar.
+  const [editingId, setEditingId] = useState(null);
+  const [savedNotice, setSavedNotice] = useState(false);
 
   function refresh() {
     getAllPosts().then(setPosts);
   }
   useEffect(refresh, []);
 
-  async function add() {
+  async function save() {
     if (!draft.title) return;
-    await createPost({ ...draft, slug: draft.slug || slugify(draft.title), published_at: new Date().toISOString() });
-    setDraft({ title: "", slug: "", excerpt: "", content: "", cover_image: "", category: "", published: true });
+    // Siempre se pasa por slugify, incluso si el slug fue escrito a mano —
+    // así es imposible que quede guardado con mayúsculas o espacios (eso fue
+    // justo lo que rompió /blog/Segurodecenal: al escribirlo a mano quedó
+    // con S mayúscula, y la comparación contra la URL es exacta).
+    const slug = slugify(draft.slug || draft.title);
+    if (editingId) {
+      await updatePost(editingId, { ...draft, slug });
+    } else {
+      await createPost({ ...draft, slug, published_at: new Date().toISOString() });
+    }
+    setDraft(EMPTY_POST_DRAFT);
+    setEditingId(null);
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 2000);
     refresh();
+  }
+
+  function edit(post) {
+    setEditingId(post.id);
+    setDraft({
+      title: post.title || "",
+      slug: post.slug || "",
+      excerpt: post.excerpt || "",
+      content: post.content || "",
+      cover_image: post.cover_image || "",
+      category: post.category || "",
+      published: post.published,
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft(EMPTY_POST_DRAFT);
   }
 
   async function togglePublished(post) {
@@ -327,19 +365,24 @@ function BlogEditor() {
 
   async function remove(id) {
     await deletePost(id);
+    if (editingId === id) cancelEdit();
     refresh();
   }
 
   return (
     <div className="space-y-6">
       <div className="doc-card p-6 space-y-3">
-        <h2 className="font-display font-semibold text-lg">Nuevo artículo</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display font-semibold text-lg">{editingId ? "Editar artículo" : "Nuevo artículo"}</h2>
+          {savedNotice && <span className="text-xs text-accent font-mono">Guardado ✓</span>}
+        </div>
         <p className="text-xs text-muted font-mono">
-          Al publicar, la página pública tarda hasta 1h en actualizarse (ISR) — ver revalidate en app/blog/page.jsx.
+          Al publicar o editar, la página pública y el mapa del sitio (sitemap.xml) pueden tardar hasta 1h en
+          actualizarse (ISR) — ver revalidate en app/blog/page.jsx, app/blog/[slug]/page.jsx y app/sitemap.js.
         </p>
         <Field label="Título" value={draft.title} onChange={(v) => setDraft({ ...draft, title: v })} />
         <Field
-          label="Slug (URL) — se genera solo si lo dejas vacío"
+          label="Slug (URL) — se genera solo si lo dejas vacío; siempre se guarda en minúsculas y sin espacios"
           value={draft.slug}
           onChange={(v) => setDraft({ ...draft, slug: v })}
         />
@@ -358,7 +401,18 @@ function BlogEditor() {
           folder="blog"
           onChange={(url) => setDraft({ ...draft, cover_image: url })}
         />
-        <SaveButton onClick={add} label="Publicar artículo" />
+        <div className="flex items-center gap-3">
+          <SaveButton onClick={save} label={editingId ? "Guardar cambios" : "Publicar artículo"} />
+          {editingId && (
+            <button
+              onClick={cancelEdit}
+              type="button"
+              className="text-xs font-mono text-muted hover:text-foreground"
+            >
+              Cancelar edición
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -372,6 +426,9 @@ function BlogEditor() {
               <p className="text-sm text-muted">{post.excerpt}</p>
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">
+              <button onClick={() => edit(post)} className="text-xs font-mono text-muted hover:text-accent">
+                Editar
+              </button>
               <button onClick={() => togglePublished(post)} className="text-xs font-mono text-muted hover:text-accent">
                 {post.published ? "Ocultar" : "Publicar"}
               </button>

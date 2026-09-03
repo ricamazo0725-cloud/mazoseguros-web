@@ -3,10 +3,12 @@ import { getPublishedPostsSafe } from "@/lib/blog";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || seoConfig.siteUrl;
 
-// Con "output: export" (Hostinger) el sitemap se genera una vez en cada
-// build, no por-request — de ahí el revalidate explícito, que exige la
-// exportación estática. Para que un post nuevo aparezca acá hay que volver
-// a correr el build y subir los archivos (ver MIGRACION.md).
+// Este proyecto corre en modo servidor + ISR (ver next.config.mjs — NO usa
+// "output: export"), así que este sitemap se regenera solo, sin necesidad
+// de un build nuevo: cada post que se publique o edite desde /admin (pestaña
+// Blog) aparece acá automáticamente. El "revalidate" es solo la ventana de
+// caché — hasta 1h para que la próxima visita a /sitemap.xml recoja los
+// cambios más recientes de Supabase.
 export const revalidate = 3600;
 
 // Se genera a partir de las rutas reales que existen en el código (app/) más
