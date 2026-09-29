@@ -10,9 +10,18 @@ export async function POST(request) {
   if (!process.env.PUSH_SECRET || request.headers.get("x-push-secret") !== process.env.PUSH_SECRET) {
     return json({ error: "forbidden" }, 403);
   }
-  const { NEXT_PUBLIC_VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: priv, VAPID_SUBJECT: subject } = process.env;
-  if (!pub || !priv) return json({ error: "Faltan las llaves VAPID" }, 500);
-  webpush.setVapidDetails(subject || "mailto:mazseguros@hotmail.com", pub, priv);
+  // Se leen con process.env[...] para que Next no las "congele" en el build.
+  const env = process.env;
+  const pub = env["NEXT_PUBLIC_VAPID_PUBLIC_KEY"] || env["VAPID_PUBLIC_KEY"];
+  const priv = env["VAPID_PRIVATE_KEY"];
+  const subject = env["VAPID_SUBJECT"] || "mailto:mazseguros@hotmail.com";
+  const missing = [!pub && "NEXT_PUBLIC_VAPID_PUBLIC_KEY", !priv && "VAPID_PRIVATE_KEY"].filter(Boolean);
+  if (missing.length) return json({ error: "Faltan variables en el servidor: " + missing.join(", ") }, 500);
+  try {
+    webpush.setVapidDetails(subject, pub.trim(), priv.trim());
+  } catch (e) {
+    return json({ error: "Llaves VAPID inválidas: " + e.message }, 500);
+  }
 
   let payload;
   try {
