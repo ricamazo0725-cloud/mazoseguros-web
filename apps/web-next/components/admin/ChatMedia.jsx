@@ -45,64 +45,96 @@ export function MessageMedia({ m }) {
   );
 }
 
-// Reproductor de notas de voz. Descarga el archivo y lo reproduce desde memoria
-// (algunos navegadores/webviews rechazan el enlace directo del bucket). Si el
-// <audio> nativo tampoco puede, lo decodifica y reproduce con Web Audio.
+// Reproductor de notas de voz con Web Audio: descarga el archivo, lo decodifica y
+// lo reproduce. No usa <audio> porque algunos navegadores/webviews muestran 0:00
+// y no reproducen el OGG/Opus de WhatsApp desde el bucket.
 function AudioPlayer({ url }) {
-  const [blobUrl, setBlobUrl] = useState(null);
-  const [bytes, setBytes] = useState(null);
-  const [mode, setMode] = useState("native"); // native | webaudio
+  const [decoded, setDecoded] = useState(null);
   const [err, setErr] = useState("");
   const [playing, setPlaying] = useState(false);
-  const [duration, setDuration] = useState(null);
+  const [pos, setPos] = useState(0);
   const ctxRef = useRef(null);
   const srcRef = useRef(null);
+  const startRef = useRef(0); // ctx.currentTime - offset al iniciar
+  const offsetRef = useRef(0); // segundos ya reproducidos (para pausar/reanudar)
+  const rafRef = useRef(null);
 
   useEffect(() => {
-    let revoke = null;
     let cancelled = false;
-    fetch(url)
-      .then((r) => {
+    (async () => {
+      try {
+        const r = await fetch(url);
         if (!r.ok) throw new Error(`No se pudo descargar el audio (${r.status})`);
-        return r.arrayBuffer();
-      })
-      .then((buf) => {
-        if (cancelled) return;
-        setBytes(buf);
-        revoke = URL.createObjectURL(new Blob([buf], { type: "audio/ogg" }));
-        setBlobUrl(revoke);
-      })
-      .catch((e) => setErr(e.message));
+        const buf = await r.arrayBuffer();
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctxRef.current = ctx;
+        const audio = await ctx.decodeAudioData(buf);
+        if (!cancelled) setDecoded(audio);
+      } catch (e) {
+        if (!cancelled) setErr(e?.message?.includes("descargar") ? e.message : "Este navegador no puede reproducir la nota de voz.");
+      }
+    })();
     return () => {
       cancelled = true;
-      if (revoke) URL.revokeObjectURL(revoke);
-      srcRef.current?.stop?.();
+      cancelAnimationFrame(rafRef.current);
+      try { srcRef.current?.stop(); } catch {}
       ctxRef.current?.close?.();
     };
   }, [url]);
 
-  async function toggleWebAudio() {
-    try {
-      if (playing) {
-        srcRef.current?.stop();
-        setPlaying(false);
-        return;
-      }
-      const ctx = ctxRef.current || new (window.AudioContext || window.webkitAudioContext)();
-      ctxRef.current = ctx;
-      const decoded = await ctx.decodeAudioData(bytes.slice(0));
-      setDuration(decoded.duration);
-      const src = ctx.createBufferSource();
-      src.buffer = decoded;
-      src.connect(ctx.destination);
-      src.onended = () => setPlaying(false);
-      src.start();
-      srcRef.current = src;
-      setPlaying(true);
-    } catch (e) {
-      setErr("Este navegador no puede reproducir la nota de voz. Prueba en Chrome o descárgala.");
+  function tick() {
+    const ctx = ctxRef.current;
+    if (!ctx || !decoded) return;
+    setPos(Math.min(ctx.currentTime - startRef.current, decoded.duration));
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  async function play(from = offsetRef.current) {
+    const ctx = ctxRef.current;
+    if (ctx.state === "suspended") await ctx.resume();
+    const src = ctx.createBufferSource();
+    src.buffer = decoded;
+    src.connect(ctx.destination);
+    src.onended = () => {
+      if (srcRef.current !== src) return; // se detuvo para pausar/buscar
+      cancelAnimationFrame(rafRef.current);
+      offsetRef.current = 0;
+      setPos(0);
+      setPlaying(false);
+    };
+    if (from >= decoded.duration) from = 0;
+    startRef.current = ctx.currentTime - from;
+    src.start(0, from);
+    srcRef.current = src;
+    setPlaying(true);
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  function pause() {
+    const ctx = ctxRef.current;
+    offsetRef.current = ctx.currentTime - startRef.current;
+    const src = srcRef.current;
+    srcRef.current = null;
+    try { src?.stop(); } catch {}
+    cancelAnimationFrame(rafRef.current);
+    setPlaying(false);
+  }
+
+  function seek(e) {
+    if (!decoded) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = ((e.clientX - rect.left) / rect.width) * decoded.duration;
+    offsetRef.current = t;
+    setPos(t);
+    if (playing) {
+      const src = srcRef.current;
+      srcRef.current = null;
+      try { src?.stop(); } catch {}
+      play(t);
     }
   }
+
+  const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
   if (err) {
     return (
@@ -112,17 +144,30 @@ function AudioPlayer({ url }) {
       </div>
     );
   }
-  if (!blobUrl) return <div className="text-xs opacity-80">🎤 Nota de voz · cargando…</div>;
+  if (!decoded) return <div className="text-xs opacity-80">🎤 Nota de voz · cargando…</div>;
 
-  if (mode === "webaudio") {
-    return (
-      <button type="button" onClick={toggleWebAudio} className="text-xs font-mono border rounded px-3 py-2 border-current">
-        {playing ? "■ Detener" : "▶ Reproducir nota de voz"}
-        {duration ? ` · ${Math.round(duration)} s` : ""}
+  const pct = (pos / decoded.duration) * 100;
+  return (
+    <div className="flex items-center gap-3 w-[240px] max-w-full">
+      <button
+        type="button"
+        onClick={() => (playing ? pause() : play())}
+        aria-label={playing ? "Pausar" : "Reproducir"}
+        className="w-9 h-9 shrink-0 rounded-full border border-current flex items-center justify-center text-sm"
+      >
+        {playing ? "❚❚" : "▶"}
       </button>
-    );
-  }
-  return <audio controls preload="metadata" src={blobUrl} onError={() => setMode("webaudio")} className="max-w-[260px] h-10" />;
+      <div className="flex-1 space-y-1">
+        <div onClick={seek} className="h-2 rounded-full bg-current/20 cursor-pointer relative overflow-hidden" style={{ backgroundColor: "rgba(127,127,127,.3)" }}>
+          <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="text-[10px] font-mono opacity-70 flex justify-between">
+          <span>{fmt(pos)}</span>
+          <span>{fmt(decoded.duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ───────────── Grabar y enviar nota de voz ─────────────
