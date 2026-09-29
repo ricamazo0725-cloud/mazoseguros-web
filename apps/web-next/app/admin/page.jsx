@@ -10,9 +10,10 @@ import { getQuoteRequests, markQuoteRequestHandled } from "@/lib/quotes";
 import CrmPanel from "@/components/admin/CrmPanel";
 import AgendaPanel from "@/components/admin/AgendaPanel";
 import PushToggle from "@/components/admin/PushToggle";
+import PoliciesPanel from "@/components/admin/PoliciesPanel";
 import { registerAdminSW } from "@/lib/push";
 
-const TABS = ["CRM", "Agenda", "Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
+const TABS = ["CRM", "Pólizas", "Agenda", "Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
 const CATEGORY_IDS = ["auto", "propiedades", "salud", "obras-civiles"];
 const CATEGORY_LABEL = { auto: "Autos", propiedades: "Propiedades", salud: "Salud", "obras-civiles": "Obras civiles" };
 
@@ -44,7 +45,8 @@ function Dashboard() {
         setTab("CRM");
         setOpenContactId(contact);
       } else if (t) {
-        const match = TABS.find((x) => x.toLowerCase() === t.toLowerCase());
+        const plain = (x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const match = TABS.find((x) => plain(x) === plain(t));
         if (match) setTab(match);
       }
     }
@@ -96,6 +98,14 @@ function Dashboard() {
             onSchedule={(contact) => {
               setSchedulePreset(contact);
               setTab("Agenda");
+            }}
+          />
+        )}
+        {tab === "Pólizas" && (
+          <PoliciesPanel
+            onOpenContact={(id) => {
+              setOpenContactId(id);
+              setTab("CRM");
             }}
           />
         )}

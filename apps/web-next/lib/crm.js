@@ -52,8 +52,12 @@ export async function listContacts({ search = "", status = "" } = {}) {
     .limit(200);
   if (status) q = q.eq("status", status);
   const term = search.trim().replace(/[%,()]/g, "");
-  if (term) q = q.or(`name.ilike.%${term}%,wa_name.ilike.%${term}%,phone.ilike.%${term.replace(/\D/g, "") || term}%`);
+  if (term) q = q.or(`name.ilike.%${term}%,wa_name.ilike.%${term}%,phone.ilike.%${term.replace(/\D/g, "") || term}%,doc_number.ilike.%${term}%`);
   return check(await q) ?? [];
+}
+
+export async function getContact(id) {
+  return check(await need().from("crm_contacts").select("*").eq("id", id).maybeSingle());
 }
 
 export async function updateContact(id, patch) {

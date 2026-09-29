@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ContactPolicies } from "@/components/admin/PoliciesPanel";
 import {
   CONTACT_STATUS,
   TOPICS,
   listContacts,
   updateContact,
+  getContact,
   getMessages,
   markRead,
   sendReply,
@@ -49,7 +51,14 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
     if (initialContactId) setSelectedId(initialContactId);
   }, [initialContactId]);
 
-  const selected = contacts.find((c) => c.id === selectedId) || null;
+  // Un contacto abierto desde Pólizas o un aviso puede no estar en la lista (solo trae 200)
+  const [extra, setExtra] = useState(null);
+  useEffect(() => {
+    if (!selectedId || contacts.some((c) => c.id === selectedId) || extra?.id === selectedId) return;
+    getContact(selectedId).then(setExtra).catch(() => {});
+  }, [selectedId, contacts, extra]);
+
+  const selected = contacts.find((c) => c.id === selectedId) || (extra?.id === selectedId ? extra : null);
 
   return (
     <div className="grid gap-6 md:grid-cols-[320px_1fr]">
@@ -90,7 +99,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
                   )}
                 </div>
                 <div className="text-xs font-mono text-muted flex justify-between gap-2">
-                  <span>+{c.phone}</span>
+                  <span>{c.phone ? `+${c.phone}` : c.doc_number || "sin teléfono"}</span>
                   <span>
                     {c.bot_state === "asesor" && "🙋 "}
                     {CONTACT_STATUS[c.status] || c.status}
@@ -133,6 +142,9 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
     status: contact.status,
     interest: contact.interest || "",
     notes: contact.notes || "",
+    doc_type: contact.doc_type || "",
+    doc_number: contact.doc_number || "",
+    city: contact.city || "",
   });
   const [saved, setSaved] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -161,6 +173,9 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
       status: form.status,
       interest: form.interest || null,
       notes: form.notes || null,
+      doc_type: form.doc_type || null,
+      doc_number: form.doc_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() || null,
+      city: form.city || null,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -174,11 +189,13 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
           <div>
             <h2 className="font-display font-semibold text-lg">{contact.name || contact.wa_name || "Sin nombre"}</h2>
             <p className="text-xs font-mono text-muted">
-              +{contact.phone} · origen: {contact.source}
+              {contact.phone ? `+${contact.phone}` : "sin teléfono"}
+              {contact.doc_number && ` · ${contact.doc_type || "Doc"} ${contact.doc_number}`} · origen: {contact.source}
               {contact.wa_name && contact.wa_name !== contact.name ? ` · WhatsApp: ${contact.wa_name}` : ""}
             </p>
           </div>
           <div className="flex gap-2">
+            {contact.phone && (
             <a
               href={waLink(contact.phone)}
               target="_blank"
@@ -187,6 +204,7 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
             >
               Abrir WhatsApp
             </a>
+            )}
             <button onClick={() => onSchedule(contact)} className="btn-cta text-xs py-2 px-4">
               Agendar asesoría
             </button>
@@ -201,6 +219,30 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
           <div className="space-y-1">
             <label className={label}>Correo</label>
             <input className={input} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <label className={label}>Documento</label>
+            <div className="flex gap-2">
+              <select
+                className={`${input} w-24`}
+                value={form.doc_type}
+                onChange={(e) => setForm({ ...form, doc_type: e.target.value })}
+              >
+                <option value="">—</option>
+                {["CC", "NIT", "CE", "PAS"].map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+              <input
+                className={input}
+                value={form.doc_number}
+                onChange={(e) => setForm({ ...form, doc_number: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className={label}>Ciudad</label>
+            <input className={input} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           </div>
           <div className="space-y-1">
             <label className={label}>Estado</label>
@@ -244,6 +286,8 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
           {saved && <span className="text-xs text-accent font-mono">Guardado ✓</span>}
         </div>
       </div>
+
+      <ContactPolicies contactId={contact.id} />
 
       <div className="doc-card p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
