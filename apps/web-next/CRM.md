@@ -21,3 +21,22 @@ La anon key del sitio no puede ejecutar ninguna de estas funciones. Solo las usa
 | `crm_log_outbound(phone, body, wa_message_id, sent_by, status, raw)` | Registra un mensaje enviado por el bot o por un asesor. |
 | `crm_update_status(wa_message_id, status, alt_id)` | Actualiza el estado de entrega (sent, delivered, read o failed). Nunca retrocede de estado. |
 | `crm_available_slots(day)` | Devuelve los horarios libres de un día en hora de Colombia. Lo usa el admin y lo usará BotMazo para ofrecer citas. |
+
+## App en el celular: avisos push y respuestas por WhatsApp
+
+`/admin` se puede instalar como app (PWA) y avisa con notificaciones push cuando:
+
+- alguien pide hablar con un asesor,
+- te escribe un cliente que está en modo asesor,
+- el bot agenda una cita,
+- llega una cotización desde la web.
+
+Desde la conversación puedes responder por WhatsApp. Al enviar, BotMazo se pausa en ese chat, y con el botón "devolver al bot" lo reactivas. Solo se puede escribir dentro de las 24 h desde el último mensaje del cliente, que es una regla de WhatsApp.
+
+### Puesta en marcha
+
+1. Ejecuta `apps/web/supabase/crm_push.sql` en Supabase. Luego llena `crm_private_config` con la URL `https://mazoseguros.com/api/push/send` y el `PUSH_SECRET`; el comando está comentado dentro del archivo.
+2. En Hostinger, agrega las variables de `.env.local.example` de la sección "App del admin" y vuelve a desplegar.
+3. En el celular, abre `https://mazoseguros.com/admin`:
+   - **Android (Chrome):** menú ⋮ → "Instalar app", y después toca "🔕 Activar avisos".
+   - **iPhone (Safari, iOS 16.4 o superior):** Compartir → "Agregar a inicio", abre la app desde el ícono y toca "🔕 Activar avisos".

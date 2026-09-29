@@ -142,3 +142,7 @@ body {
   margin-bottom: 1.25em;
   line-height: 1.75;
 }
+
+/* Pestañas del admin deslizables en el celular */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

@@ -165,3 +165,30 @@ export function dayStartIso(ymd) {
 export function waLink(phone) {
   return `https://wa.me/${String(phone || "").replace(/\D/g, "")}`;
 }
+
+// ───────────── Responder desde el admin ─────────────
+
+export const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export async function sendReply(contactId, text) {
+  const { data } = await need().auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
+  const res = await fetch("/api/crm/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ contactId, text }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
+  return body;
+}
+
+// true = el bot vuelve a atender; false = el asesor toma la conversación (bot en silencio)
+export async function setBotActive(contactId, active) {
+  return updateContact(contactId, {
+    bot_state: active ? null : "asesor",
+    bot_data: active ? {} : { taken_by: "admin" },
+    bot_updated_at: new Date().toISOString(),
+  });
+}

@@ -9,6 +9,8 @@ import { getAllPosts, createPost, updatePost, deletePost } from "@/lib/blog";
 import { getQuoteRequests, markQuoteRequestHandled } from "@/lib/quotes";
 import CrmPanel from "@/components/admin/CrmPanel";
 import AgendaPanel from "@/components/admin/AgendaPanel";
+import PushToggle from "@/components/admin/PushToggle";
+import { registerAdminSW } from "@/lib/push";
 
 const TABS = ["CRM", "Agenda", "Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
 const CATEGORY_IDS = ["auto", "propiedades", "salud", "obras-civiles"];
@@ -23,33 +25,63 @@ export default function AdminDashboardPage() {
 }
 
 function Dashboard() {
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
   const [tab, setTab] = useState("CRM");
   // Contacto que se manda desde el CRM a la pestaña Agenda con "Agendar asesoría"
   const [schedulePreset, setSchedulePreset] = useState(null);
   const clearPreset = useCallback(() => setSchedulePreset(null), []);
+  // Contacto a abrir cuando se entra desde una notificación (/admin?contact=<id>)
+  const [openContactId, setOpenContactId] = useState(null);
+
+  useEffect(() => {
+    registerAdminSW();
+
+    function applyUrl(href) {
+      const url = new URL(href, window.location.origin);
+      const contact = url.searchParams.get("contact");
+      const t = url.searchParams.get("tab");
+      if (contact) {
+        setTab("CRM");
+        setOpenContactId(contact);
+      } else if (t) {
+        const match = TABS.find((x) => x.toLowerCase() === t.toLowerCase());
+        if (match) setTab(match);
+      }
+    }
+    applyUrl(window.location.href);
+
+    // Notificación tocada con la app ya abierta: el service worker avisa por mensaje
+    function onMessage(e) {
+      if (e.data?.type === "open-url") applyUrl(e.data.url);
+    }
+    navigator.serviceWorker?.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <span className="font-display font-semibold">Mazoseguros · Admin</span>
+      <header className="sticky top-0 z-10 border-b border-border bg-primary text-primary-foreground pt-[env(safe-area-inset-top)]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
+          <span className="font-display font-semibold truncate">Mazoseguros<span className="hidden sm:inline"> · Admin</span></span>
+          <div className="flex items-center gap-2">
+          <PushToggle email={session?.user?.email} />
           <button
             onClick={signOut}
             className="text-xs font-mono border border-primary-foreground/30 rounded px-3 py-1.5 hover:border-primary-foreground"
           >
-            Cerrar sesión
+            Salir
           </button>
+          </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <nav className="flex gap-2 mb-10 flex-wrap text-xs font-mono uppercase tracking-wider">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+        <nav className="flex gap-2 mb-6 sm:mb-10 overflow-x-auto no-scrollbar text-xs font-mono uppercase tracking-wider -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded border focus-ring ${
+              className={`shrink-0 px-4 py-2 rounded border focus-ring ${
                 tab === t ? "border-accent text-accent" : "border-border text-muted hover:text-foreground"
               }`}
             >
@@ -60,6 +92,7 @@ function Dashboard() {
 
         {tab === "CRM" && (
           <CrmPanel
+            initialContactId={openContactId}
             onSchedule={(contact) => {
               setSchedulePreset(contact);
               setTab("Agenda");
