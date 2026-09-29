@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import RequireAuth from "@/components/RequireAuth";
 import { getAllSections, upsertSection } from "@/lib/content";
 import { uploadImage } from "@/lib/media";
 import { getAllPosts, createPost, updatePost, deletePost } from "@/lib/blog";
 import { getQuoteRequests, markQuoteRequestHandled } from "@/lib/quotes";
+import CrmPanel from "@/components/admin/CrmPanel";
+import AgendaPanel from "@/components/admin/AgendaPanel";
 
-const TABS = ["Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
+const TABS = ["CRM", "Agenda", "Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
 const CATEGORY_IDS = ["auto", "propiedades", "salud", "obras-civiles"];
 const CATEGORY_LABEL = { auto: "Autos", propiedades: "Propiedades", salud: "Salud", "obras-civiles": "Obras civiles" };
 
@@ -22,12 +24,15 @@ export default function AdminDashboardPage() {
 
 function Dashboard() {
   const { signOut } = useAuth();
-  const [tab, setTab] = useState("Contenido");
+  const [tab, setTab] = useState("CRM");
+  // Contacto que se manda desde el CRM a la pestaña Agenda con "Agendar asesoría"
+  const [schedulePreset, setSchedulePreset] = useState(null);
+  const clearPreset = useCallback(() => setSchedulePreset(null), []);
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <span className="font-display font-semibold">Mazoseguros · Admin</span>
           <button
             onClick={signOut}
@@ -38,7 +43,7 @@ function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         <nav className="flex gap-2 mb-10 flex-wrap text-xs font-mono uppercase tracking-wider">
           {TABS.map((t) => (
             <button
@@ -53,6 +58,15 @@ function Dashboard() {
           ))}
         </nav>
 
+        {tab === "CRM" && (
+          <CrmPanel
+            onSchedule={(contact) => {
+              setSchedulePreset(contact);
+              setTab("Agenda");
+            }}
+          />
+        )}
+        {tab === "Agenda" && <AgendaPanel preset={schedulePreset} onPresetUsed={clearPreset} />}
         {tab === "Contenido" && <ContentEditor />}
         {tab === "Imágenes" && <MediaEditor />}
         {tab === "Seguros" && <CategoriesEditor />}
