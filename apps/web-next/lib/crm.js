@@ -27,6 +27,7 @@ export const TOPICS = {
   auto: "Autos",
   propiedades: "Propiedades",
   salud: "Salud",
+  vida: "Vida",
   "obras-civiles": "Obras civiles",
   otro: "Otro",
 };
