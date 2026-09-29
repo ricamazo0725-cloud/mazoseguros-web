@@ -52,7 +52,15 @@ export async function POST(request) {
 
   const buf = Buffer.from(await res.arrayBuffer());
   if (buf.length > MAX_BYTES) return fail("Archivo demasiado grande");
-  const mime = (media.mime_type || res.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
+  if (buf.length < 100) return fail(`Archivo vacío o incompleto (${buf.length} bytes)`);
+
+  // Verificar por el contenido que sí es el archivo y no una página/JSON de error
+  const sniffed = sniff(buf);
+  const served = (res.headers.get("content-type") || "").split(";")[0].trim();
+  if (!sniffed && (/html|json|xml|text\//.test(served) || buf[0] === 0x3c || buf[0] === 0x7b)) {
+    return fail(`La descarga no es un archivo (${served || "sin tipo"}): ${buf.subarray(0, 120).toString("utf8").replace(/\s+/g, " ")}`);
+  }
+  const mime = sniffed || (media.mime_type || served || "application/octet-stream").split(";")[0].trim();
   const ext = EXT[mime] || (media.filename?.split(".").pop() ?? "bin");
   const path = `in/${msg.contact_id}/${msg.id}.${ext}`;
 
@@ -64,4 +72,18 @@ export async function POST(request) {
     .update({ media_path: path, media_mime: mime, media_error: null, body: msg.body ?? media.caption ?? null })
     .eq("id", msg.id);
   return json({ ok: true, path, mime, bytes: buf.length });
+}
+
+// Tipo real del archivo según sus primeros bytes
+function sniff(b) {
+  const ascii = (start, len) => b.subarray(start, start + len).toString("latin1");
+  if (ascii(0, 4) === "OggS") return "audio/ogg";
+  if (ascii(0, 3) === "ID3" || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return "audio/mpeg";
+  if (ascii(0, 5) === "#!AMR") return "audio/amr";
+  if (ascii(4, 4) === "ftyp") return ascii(8, 4).startsWith("M4A") ? "audio/mp4" : "video/mp4";
+  if (ascii(0, 4) === "%PDF") return "application/pdf";
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (ascii(1, 3) === "PNG") return "image/png";
+  if (ascii(0, 4) === "RIFF" && ascii(8, 4) === "WEBP") return "image/webp";
+  return null;
 }
