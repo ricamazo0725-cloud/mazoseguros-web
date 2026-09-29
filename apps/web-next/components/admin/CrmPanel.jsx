@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactPolicies } from "@/components/admin/PoliciesPanel";
+import { MessageMedia, VoiceRecorder, isMediaMessage } from "@/components/admin/ChatMedia";
 import {
   CONTACT_STATUS,
   LEAD_SOURCE,
@@ -324,7 +325,8 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
                   m.direction === "out" ? "bg-primary text-primary-foreground" : "bg-surface-2"
                 }`}
               >
-                {m.body || <em className="opacity-70">[{m.type}]</em>}
+                {isMediaMessage(m) && <MessageMedia m={m} />}
+                {m.body ? <div>{m.body}</div> : !isMediaMessage(m) && <em className="opacity-70">[{m.type}]</em>}
                 <div className="text-[10px] opacity-70 mt-1 font-mono text-right">
                   {fmtDateTime(m.created_at)}
                   {m.direction === "out" && ` · ${m.sent_by || "bot"} · ${m.status || ""}`}
@@ -433,6 +435,7 @@ function ReplyBox({ contactId, messages, onSent }) {
         </button>
       </div>
       {error && <p className="text-xs text-danger font-mono">{error}</p>}
+      <VoiceRecorder contactId={contactId} disabled={!open} onSent={onSent} />
     </form>
   );
 }

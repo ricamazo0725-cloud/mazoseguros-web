@@ -12,9 +12,10 @@ export async function POST(request) {
   if (auth.error) return json({ error: auth.error }, auth.status);
   const { sb, user } = auth;
 
-  const { contactId, text } = await request.json().catch(() => ({}));
+  const { contactId, text, audioPath } = await request.json().catch(() => ({}));
   const body = String(text || "").trim();
-  if (!contactId || !body) return json({ error: "Falta el contacto o el mensaje" }, 400);
+  if (!contactId || (!body && !audioPath)) return json({ error: "Falta el contacto o el mensaje" }, 400);
+  if (audioPath && !/^out\/[\w-]+\/[\w.-]+\.ogg$/.test(audioPath)) return json({ error: "Ruta de audio inválida" }, 400);
   if (body.length > 4000) return json({ error: "El mensaje es demasiado largo" }, 400);
 
   const { GUPSHUP_API_KEY: apiKey, GUPSHUP_SOURCE: source, GUPSHUP_APP_NAME: appName } = process.env;
@@ -39,12 +40,20 @@ export async function POST(request) {
     );
   }
 
+  // Nota de voz: se envía un enlace temporal (7 días) al archivo en el bucket privado
+  let waMessage = { type: "text", text: body };
+  if (audioPath) {
+    const { data: signed, error: signErr } = await sb.storage.from("crm-media").createSignedUrl(audioPath, 60 * 60 * 24 * 7);
+    if (signErr) return json({ error: "No se encontró el audio: " + signErr.message }, 400);
+    waMessage = { type: "audio", url: signed.signedUrl };
+  }
+
   const form = new URLSearchParams({
     channel: "whatsapp",
     source,
     destination: contact.phone,
     "src.name": appName,
-    message: JSON.stringify({ type: "text", text: body }),
+    message: JSON.stringify(waMessage),
   });
   const res = await fetch("https://api.gupshup.io/wa/api/v1/msg", {
     method: "POST",
@@ -63,14 +72,30 @@ export async function POST(request) {
   }
 
   const sentBy = (user.email || "asesor").split("@")[0];
-  await sb.rpc("crm_log_outbound", {
-    p_phone: contact.phone,
-    p_body: body,
-    p_wa_message_id: gs.messageId || null,
-    p_sent_by: sentBy,
-    p_status: gs.status || "submitted",
-    p_raw: gs,
-  });
+  if (audioPath) {
+    await sb.from("crm_messages").insert({
+      contact_id: contactId,
+      direction: "out",
+      type: "audio",
+      body: null,
+      media_path: audioPath,
+      media_mime: "audio/ogg",
+      wa_message_id: gs.messageId || null,
+      status: gs.status || "submitted",
+      sent_by: sentBy,
+      raw: gs,
+    });
+    await sb.from("crm_contacts").update({ last_message_at: new Date().toISOString() }).eq("id", contactId);
+  } else {
+    await sb.rpc("crm_log_outbound", {
+      p_phone: contact.phone,
+      p_body: body,
+      p_wa_message_id: gs.messageId || null,
+      p_sent_by: sentBy,
+      p_status: gs.status || "submitted",
+      p_raw: gs,
+    });
+  }
   // El asesor tomó la conversación: el bot se calla (12 h desde el último mensaje del asesor)
   await sb
     .from("crm_contacts")

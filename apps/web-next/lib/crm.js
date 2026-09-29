@@ -92,7 +92,7 @@ export async function getMessages(contactId) {
     check(
       await need()
         .from("crm_messages")
-        .select("id, direction, type, body, status, sent_by, created_at")
+        .select("id, direction, type, body, status, sent_by, created_at, media_path, media_mime, media_error")
         .eq("contact_id", contactId)
         .order("created_at", { ascending: true })
         .limit(500)
@@ -218,4 +218,31 @@ export async function setBotActive(contactId, active) {
     bot_data: active ? {} : { taken_by: "admin" },
     bot_updated_at: new Date().toISOString(),
   });
+}
+
+// ───────────── Audios y archivos del chat ─────────────
+
+// Enlace temporal (1 h) para reproducir/ver un archivo del bucket privado crm-media
+export async function mediaUrl(path) {
+  const { data, error } = await need().storage.from("crm-media").createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+// Sube la nota de voz grabada (OGG/Opus) y la envía por WhatsApp
+export async function sendVoiceNote(contactId, blob) {
+  const path = `out/${contactId}/${Date.now()}.ogg`;
+  const { error } = await need().storage.from("crm-media").upload(path, blob, { contentType: "audio/ogg" });
+  if (error) throw new Error("No se pudo subir el audio: " + error.message);
+  const { data } = await need().auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
+  const res = await fetch("/api/crm/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ contactId, audioPath: path }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
+  return body;
 }
