@@ -36,6 +36,18 @@ function urlBase64ToUint8Array(base64) {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
+// La llave se pide al servidor (runtime); si vino compilada en el bundle, se usa esa.
+async function getVapidPublicKey() {
+  if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  try {
+    const res = await fetch("/api/push/key", { cache: "no-store" });
+    const body = await res.json();
+    return body.key || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function currentSubscription() {
   if (!pushSupported()) return null;
   const reg = await navigator.serviceWorker.getRegistration(SCOPE);
@@ -44,8 +56,8 @@ export async function currentSubscription() {
 
 export async function enablePush(userEmail) {
   if (!pushSupported()) throw new Error("Este navegador no soporta notificaciones.");
-  const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!vapid) throw new Error("Falta NEXT_PUBLIC_VAPID_PUBLIC_KEY en la configuración del sitio.");
+  const vapid = await getVapidPublicKey();
+  if (!vapid) throw new Error("El servidor no tiene configurada la llave de avisos (NEXT_PUBLIC_VAPID_PUBLIC_KEY en Hostinger).");
 
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("No diste permiso de notificaciones.");
