@@ -42,7 +42,7 @@ export default function Header({ logoUrl, whatsapp }) {
             </a>
           ))}
         </nav>
-        <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer" className="btn-cta text-sm py-2.5 px-4">
+        <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hola, vengo del sitio web de Mazoseguros.")}`} target="_blank" rel="noreferrer" className="btn-cta text-sm py-2.5 px-4">
           Cotiza ya
         </a>
       </div>

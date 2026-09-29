@@ -38,7 +38,7 @@ export default function Contact({ data }) {
           </p>
 
           <div className="space-y-4 mb-8">
-            <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="btn-cta inline-block">
+            <a href={`https://wa.me/${wa}?text=${encodeURIComponent("Hola, vengo del sitio web de Mazoseguros.")}`} target="_blank" rel="noreferrer" className="btn-cta inline-block">
               Escribir por WhatsApp
             </a>
 
@@ -53,7 +53,7 @@ export default function Contact({ data }) {
               <div>📧 {email}</div>
               <div>
                 💬 WhatsApp de atención:{" "}
-                <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="underline hover:text-accent">
+                <a href={`https://wa.me/${wa}?text=${encodeURIComponent("Hola, vengo del sitio web de Mazoseguros.")}`} target="_blank" rel="noreferrer" className="underline hover:text-accent">
                   {pretty(wa)}
                 </a>
               </div>

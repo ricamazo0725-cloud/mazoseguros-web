@@ -41,7 +41,7 @@ export default function Footer({ logoUrl }) {
           <ul className="space-y-2 text-sm text-primary-foreground/80">
             <li>{seoConfig.contact.email}</li>
             <li>
-              <a href={`https://wa.me/${seoConfig.contact.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="hover:text-primary-foreground">
+              <a href={`https://wa.me/${seoConfig.contact.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent("Hola, vengo del sitio web de Mazoseguros.")}`} target="_blank" rel="noreferrer" className="hover:text-primary-foreground">
                 WhatsApp: {seoConfig.contact.whatsapp.replace(/\D/g, "").replace(/^57/, "").replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3")}
               </a>
             </li>

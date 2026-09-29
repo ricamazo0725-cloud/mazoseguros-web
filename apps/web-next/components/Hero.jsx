@@ -31,7 +31,7 @@ export default function Hero({ data, bgImage }) {
 
         <div className="mt-10 flex flex-wrap gap-4">
           <a
-            href={`https://wa.me/${(data?.whatsapp || seoConfig.contact.whatsapp).replace(/\D/g, "")}`}
+            href={`https://wa.me/${(data?.whatsapp || seoConfig.contact.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent("Hola, vengo del sitio web de Mazoseguros.")}`}
             target="_blank"
             rel="noreferrer"
             className="btn-cta"

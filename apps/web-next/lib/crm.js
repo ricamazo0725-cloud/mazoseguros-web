@@ -13,6 +13,28 @@ export const CONTACT_STATUS = {
   perdido: "Perdido",
 };
 
+export const LEAD_SOURCE = {
+  sitio_web: "🌐 Sitio web",
+  anuncio: "📣 Anuncio",
+  formulario: "📝 Formulario web",
+  whatsapp: "💬 WhatsApp directo",
+  import: "📂 Importado",
+  manual: "✍️ Manual",
+};
+
+export async function getLeads(contactId) {
+  return (
+    check(
+      await need()
+        .from("crm_leads")
+        .select("id, source, detail, interest, first_message, created_at")
+        .eq("contact_id", contactId)
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ) ?? []
+  );
+}
+
 export const APPOINTMENT_STATUS = {
   pendiente: "Pendiente",
   confirmada: "Confirmada",
@@ -44,13 +66,14 @@ function check({ data, error }) {
 
 // ───────────── Contactos y mensajes ─────────────
 
-export async function listContacts({ search = "", status = "" } = {}) {
+export async function listContacts({ search = "", status = "", source = "" } = {}) {
   let q = need()
     .from("crm_contacts")
     .select("*")
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(200);
   if (status) q = q.eq("status", status);
+  if (source) q = q.eq("lead_source", source);
   const term = search.trim().replace(/[%,()]/g, "");
   if (term) q = q.or(`name.ilike.%${term}%,wa_name.ilike.%${term}%,phone.ilike.%${term.replace(/\D/g, "") || term}%,doc_number.ilike.%${term}%`);
   return check(await q) ?? [];

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactPolicies } from "@/components/admin/PoliciesPanel";
 import {
   CONTACT_STATUS,
+  LEAD_SOURCE,
+  getLeads,
   TOPICS,
   listContacts,
   updateContact,
@@ -24,17 +26,18 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const [contacts, setContacts] = useState([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [source, setSource] = useState("");
   const [selectedId, setSelectedId] = useState(initialContactId || null);
   const [error, setError] = useState("");
 
   const refresh = useCallback(() => {
-    listContacts({ search, status })
+    listContacts({ search, status, source })
       .then((rows) => {
         setContacts(rows);
         setError("");
       })
       .catch((e) => setError(e.message));
-  }, [search, status]);
+  }, [search, status, source]);
 
   useEffect(() => {
     const t = setTimeout(refresh, 250); // espera a que termine de escribir
@@ -77,6 +80,16 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
             </option>
           ))}
         </select>
+        <select className={input} value={source} onChange={(e) => setSource(e.target.value)}>
+          <option value="">Todos los orígenes</option>
+          {Object.entries(LEAD_SOURCE)
+            .filter(([k]) => k !== "import" && k !== "manual")
+            .map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+        </select>
         {error && <p className="text-xs text-danger font-mono">{error}</p>}
         <ul className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
           {contacts.length === 0 && !error && (
@@ -105,9 +118,10 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
                     {CONTACT_STATUS[c.status] || c.status}
                   </span>
                 </div>
-                {c.last_message_at && (
-                  <div className="text-[11px] text-muted mt-1">{fmtDateTime(c.last_message_at)}</div>
-                )}
+                <div className="text-[11px] text-muted mt-1 flex justify-between gap-2">
+                  <span>{LEAD_SOURCE[c.lead_source] || ""}</span>
+                  {c.last_message_at && <span>{fmtDateTime(c.last_message_at)}</span>}
+                </div>
               </button>
             </li>
           ))}
@@ -210,6 +224,8 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
             </button>
           </div>
         </div>
+
+        <LeadHistory contactId={contact.id} />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1">
@@ -418,5 +434,25 @@ function ReplyBox({ contactId, messages, onSent }) {
       </div>
       {error && <p className="text-xs text-danger font-mono">{error}</p>}
     </form>
+  );
+}
+
+function LeadHistory({ contactId }) {
+  const [leads, setLeads] = useState([]);
+  useEffect(() => {
+    getLeads(contactId).then(setLeads).catch(() => {});
+  }, [contactId]);
+  if (!leads.length) return null;
+  return (
+    <div className="text-xs font-mono text-muted space-y-1 border-l-2 border-accent pl-3">
+      {leads.map((l) => (
+        <div key={l.id}>
+          <span className="text-foreground">{LEAD_SOURCE[l.source] || l.source}</span>
+          {l.detail && ` · ${l.detail}`}
+          {l.interest && ` · ${TOPICS[l.interest] || l.interest}`} · {fmtDateTime(l.created_at)}
+          {l.first_message && <div className="italic truncate">“{l.first_message}”</div>}
+        </div>
+      ))}
+    </div>
   );
 }
