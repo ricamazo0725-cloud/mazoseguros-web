@@ -29,7 +29,7 @@ export function MessageMedia({ m }) {
   if (err) return <div className="text-xs opacity-80">{icon} · ⚠️ {err}</div>;
   if (!url) return <div className="text-xs opacity-80">{icon} · cargando…</div>;
 
-  if (kind === "audio") return <audio controls preload="metadata" src={url} className="max-w-[260px] h-10" />;
+  if (kind === "audio") return <AudioPlayer url={url} />;
   if (kind === "image" || kind === "sticker")
     return (
       <a href={url} target="_blank" rel="noreferrer">
@@ -43,6 +43,86 @@ export function MessageMedia({ m }) {
       {icon} · abrir
     </a>
   );
+}
+
+// Reproductor de notas de voz. Descarga el archivo y lo reproduce desde memoria
+// (algunos navegadores/webviews rechazan el enlace directo del bucket). Si el
+// <audio> nativo tampoco puede, lo decodifica y reproduce con Web Audio.
+function AudioPlayer({ url }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [bytes, setBytes] = useState(null);
+  const [mode, setMode] = useState("native"); // native | webaudio
+  const [err, setErr] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(null);
+  const ctxRef = useRef(null);
+  const srcRef = useRef(null);
+
+  useEffect(() => {
+    let revoke = null;
+    let cancelled = false;
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(`No se pudo descargar el audio (${r.status})`);
+        return r.arrayBuffer();
+      })
+      .then((buf) => {
+        if (cancelled) return;
+        setBytes(buf);
+        revoke = URL.createObjectURL(new Blob([buf], { type: "audio/ogg" }));
+        setBlobUrl(revoke);
+      })
+      .catch((e) => setErr(e.message));
+    return () => {
+      cancelled = true;
+      if (revoke) URL.revokeObjectURL(revoke);
+      srcRef.current?.stop?.();
+      ctxRef.current?.close?.();
+    };
+  }, [url]);
+
+  async function toggleWebAudio() {
+    try {
+      if (playing) {
+        srcRef.current?.stop();
+        setPlaying(false);
+        return;
+      }
+      const ctx = ctxRef.current || new (window.AudioContext || window.webkitAudioContext)();
+      ctxRef.current = ctx;
+      const decoded = await ctx.decodeAudioData(bytes.slice(0));
+      setDuration(decoded.duration);
+      const src = ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(ctx.destination);
+      src.onended = () => setPlaying(false);
+      src.start();
+      srcRef.current = src;
+      setPlaying(true);
+    } catch (e) {
+      setErr("Este navegador no puede reproducir la nota de voz. Prueba en Chrome o descárgala.");
+    }
+  }
+
+  if (err) {
+    return (
+      <div className="text-xs opacity-80 space-y-1">
+        <div>⚠️ {err}</div>
+        <a href={url} target="_blank" rel="noreferrer" className="underline">Descargar audio</a>
+      </div>
+    );
+  }
+  if (!blobUrl) return <div className="text-xs opacity-80">🎤 Nota de voz · cargando…</div>;
+
+  if (mode === "webaudio") {
+    return (
+      <button type="button" onClick={toggleWebAudio} className="text-xs font-mono border rounded px-3 py-2 border-current">
+        {playing ? "■ Detener" : "▶ Reproducir nota de voz"}
+        {duration ? ` · ${Math.round(duration)} s` : ""}
+      </button>
+    );
+  }
+  return <audio controls preload="metadata" src={blobUrl} onError={() => setMode("webaudio")} className="max-w-[260px] h-10" />;
 }
 
 // ───────────── Grabar y enviar nota de voz ─────────────
