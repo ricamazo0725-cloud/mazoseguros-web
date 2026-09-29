@@ -40,7 +40,16 @@ export default function Footer({ logoUrl }) {
           <div className="eyebrow mb-3">Contacto</div>
           <ul className="space-y-2 text-sm text-primary-foreground/80">
             <li>{seoConfig.contact.email}</li>
-            <li>{seoConfig.contact.phone}</li>
+            <li>
+              <a href={`https://wa.me/${seoConfig.contact.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="hover:text-primary-foreground">
+                WhatsApp: {seoConfig.contact.whatsapp.replace(/\D/g, "").replace(/^57/, "").replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3")}
+              </a>
+            </li>
+            <li>
+              <a href={`tel:${seoConfig.contact.phone}`} className="hover:text-primary-foreground">
+                Llamadas: {seoConfig.contact.phone.replace(/\D/g, "").replace(/^57/, "").replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3")}
+              </a>
+            </li>
             <li>Medellín, Colombia</li>
           </ul>
         </div>

@@ -207,6 +207,11 @@ function ContentEditor() {
           value={contact.whatsapp}
           onChange={(v) => setContact({ ...contact, whatsapp: v })}
         />
+        <Field
+          label="Teléfono para llamadas (con +57)"
+          value={contact.phone}
+          onChange={(v) => setContact({ ...contact, phone: v })}
+        />
         <Field label="Correo" value={contact.email} onChange={(v) => setContact({ ...contact, email: v })} />
         <SaveButton onClick={() => save("contact", contact)} />
       </section>

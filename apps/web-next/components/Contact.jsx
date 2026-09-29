@@ -10,7 +10,9 @@ export default function Contact({ data }) {
 
   const wa = (data?.whatsapp || seoConfig.contact.whatsapp).replace(/\D/g, "");
   const mapsUrl = seoConfig.address.googleMapsUrl;
-  const phone = seoConfig.contact.phone;
+  const phone = (data?.phone || seoConfig.contact.phone).replace(/[^\d+]/g, "");
+  // "+573012788799" → "301 278 8799"
+  const pretty = (n) => n.replace(/\D/g, "").replace(/^57/, "").replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3");
   const email = seoConfig.contact.email;
 
   async function handleSubmit(e) {
@@ -49,7 +51,18 @@ export default function Contact({ data }) {
             <div className="text-sm text-muted font-mono">
               <div className="font-semibold text-foreground mb-2">Información de contacto:</div>
               <div>📧 {email}</div>
-              <div>📱 {phone}</div>
+              <div>
+                💬 WhatsApp de atención:{" "}
+                <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="underline hover:text-accent">
+                  {pretty(wa)}
+                </a>
+              </div>
+              <div>
+                📞 Llamadas:{" "}
+                <a href={`tel:${phone}`} className="underline hover:text-accent">
+                  {pretty(phone)}
+                </a>
+              </div>
             </div>
 
             <div className="mt-6 rounded-lg overflow-hidden border border-border">
