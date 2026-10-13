@@ -270,6 +270,7 @@ export function NewContactForm({ onCreated, onOpen, onCancel }) {
 // ───────────── Importar clientes (archivo CSV o CSV/JSON pegado) ─────────────
 export function ContactImport({ onDone, onOpen, onCancel }) {
   const [text, setText] = useState("");
+  const [soloSoat, setSoloSoat] = useState(false);
   const [fileName, setFileName] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
@@ -279,13 +280,37 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
 
   const parsed = useMemo(() => {
     try {
-      return { ...parseClients(text), error: "" };
+      const p = parseClients(text);
+      // "Solo SOAT": vencimiento/aseguradora/póliza del archivo son del SOAT (no se crea póliza)
+      if (soloSoat) {
+        p.rows = p.rows.map((r) => {
+          const o = { ...r };
+          const move = (from, to) => {
+            if (o[from] != null && o[to] == null) o[to] = o[from];
+            delete o[from];
+          };
+          move("fin_vigencia", "soat_vence");
+          move("inicio_vigencia", "soat_inicio");
+          move("aseguradora", "soat_aseguradora");
+          move("numero_poliza", "soat_poliza");
+          if (!o.placa && o.bien_asegurado) {
+            const m = String(o.bien_asegurado).toUpperCase().match(/\b([A-Z]{3}\s?-?\d{2}[A-Z0-9])\b/);
+            if (m) o.placa = m[1];
+          }
+          delete o.ramo;
+          delete o.estado;
+          return o;
+        });
+      }
+      return { ...p, error: "" };
     } catch (e) {
       return { rows: [], unknown: [], format: "", error: e instanceof SyntaxError ? "El JSON no es válido: " + e.message : e.message };
     }
-  }, [text]);
+  }, [text, soloSoat]);
 
-  const checks = parsed.rows.map(localCheck);
+  const checks = parsed.rows.map((r) =>
+    localCheck(r) || (soloSoat && !r.placa ? "falta la placa" : soloSoat && !r.soat_vence ? "falta el vencimiento del SOAT" : "")
+  );
   const valid = checks.filter((c) => !c).length;
 
   async function onFile(e) {
@@ -293,6 +318,25 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
     if (!file) return;
     setResults(null);
     setFileName(file.name);
+    // Excel (.xlsx): primera hoja → CSV con ; para reutilizar la vista previa
+    if (/\.xlsx$/i.test(file.name)) {
+      try {
+        const readXlsxFile = (await import("read-excel-file")).default;
+        const rows = await readXlsxFile(file);
+        const cell = (v) => {
+          if (v == null) return "";
+          if (v instanceof Date) return v.toISOString().slice(0, 10);
+          const s = String(v);
+          return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        setText(rows.map((r) => r.map(cell).join(";")).join("\n"));
+      } catch (err) {
+        setText("");
+        alert("No se pudo leer el Excel: " + err.message);
+      }
+      e.target.value = "";
+      return;
+    }
     const buf = await file.arrayBuffer();
     let t = new TextDecoder("utf-8").decode(buf);
     // Excel en Windows guarda CSV en Latin-1: si salen caracteres raros, se re-lee así
@@ -306,7 +350,8 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
     setError("");
     setResults(null);
     try {
-      const rows = parsed.rows.map((r) => ({ ...r }));
+      // En modo solo SOAT se omiten las filas sin placa o sin vencimiento (no tendría a qué recordar)
+      const rows = parsed.rows.filter((_, i) => !soloSoat || !checks[i]).map((r) => ({ ...r }));
       const res = await importContacts(rows, "import", (done, total) => setProgress({ done, total }));
       setResults(res);
       onDone?.();
@@ -329,7 +374,7 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
       </div>
 
       <p className="text-sm text-muted">
-        Sube un archivo <b>CSV</b> (de Excel: “Guardar como → CSV”) o pega abajo el contenido en CSV o JSON. La primera fila
+        Sube un <b>Excel (.xlsx)</b> o un <b>CSV</b> o pega abajo el contenido en CSV o JSON. La primera fila
         debe tener los encabezados. Columnas: <span className="font-mono text-xs">nombre, tipo_documento, documento, telefono,
         email, ciudad, fecha_nacimiento, asesor, interes, estado, notas, carpeta_cliente</span>. Si la fila trae <b>aseguradora</b> también se guarda la
         póliza (numero_poliza, ramo, producto, bien_asegurado, inicio_vigencia, fin_vigencia, prima, estado de la póliza).
@@ -338,9 +383,9 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
 
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => fileRef.current?.click()} className="text-xs font-mono px-3 py-2 rounded border border-border hover:border-accent">
-          📂 Subir CSV / JSON
+          📂 Subir Excel / CSV / JSON
         </button>
-        <input ref={fileRef} type="file" accept=".csv,.txt,.json,text/csv,application/json" className="hidden" onChange={onFile} />
+        <input ref={fileRef} type="file" accept=".csv,.txt,.json,.xlsx,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={onFile} />
         <button type="button" onClick={downloadTemplate} className="text-xs font-mono px-3 py-2 rounded border border-border hover:border-accent">
           ⬇️ Descargar plantilla
         </button>
@@ -355,6 +400,14 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
         placeholder={'nombre;documento;telefono;email\nAna Pérez;1020304050;3001234567;ana@correo.com\n\n— o —\n\n[{"nombre":"Ana Pérez","documento":"1020304050","telefono":"3001234567"}]'}
       />
 
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" checked={soloSoat} onChange={(e) => setSoloSoat(e.target.checked)} className="mt-1" />
+        <span>
+          <b>Este archivo es solo de SOAT</b>: las columnas de vencimiento, aseguradora y póliza se guardan como el SOAT del
+          vehículo (columna <span className="font-mono text-xs">placa</span>) y el cliente recibe los recordatorios de
+          vencimiento con la plantilla de WhatsApp. No se crean pólizas.
+        </span>
+      </label>
       {parsed.error && <p className="text-xs text-danger font-mono">{parsed.error}</p>}
 
       {parsed.rows.length > 0 && !results && (
