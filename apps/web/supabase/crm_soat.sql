@@ -265,6 +265,58 @@ create or replace function crm_soat_list_text(p_title text, p_rows crm_soat[]) r
   from unnest(p_rows) r
 $$;
 
+-- ───────────── Recordatorio para reenviar desde el celular del asesor ─────────────
+create or replace function crm_urlencode(p text) returns text language sql immutable as $$
+  select coalesce(string_agg(
+    case when ch ~ '^[A-Za-z0-9_.~-]$' then ch
+         else upper(regexp_replace(encode(convert_to(ch, 'UTF8'), 'hex'), '(..)', '%\1', 'g')) end,
+    '' order by i), '')
+  from regexp_split_to_table(coalesce(p, ''), '') with ordinality t(ch, i)
+$$;
+
+create or replace function crm_msg_image(p_url text, p_caption text) returns jsonb language sql immutable as $$
+  select jsonb_build_object('type', 'image', 'originalUrl', p_url, 'previewUrl', p_url, 'caption', p_caption)
+$$;
+
+-- Mismo texto de la plantilla de Meta "recordatorio_vencimiento", firmado por el asesor que lo pide
+-- (nombre y celular de crm_advisors; si no tiene nombre, Jesús Mazo).
+create or replace function crm_reminder_text(p_name text, p_doc text, p_plate text, p_end date, p_advisor text)
+returns text language sql stable security definer set search_path = public as $$
+  select 'Cordial saludo Sr/Sra ' || coalesce(nullif(btrim(p_name), ''), 'cliente') ||
+    ', le recordamos que el ' || p_doc || ' del vehículo de placa ' || p_plate ||
+    case when p_end < crm_today() then ' venció el ' else ' vence el ' end || to_char(p_end, 'DD/MM/YYYY') ||
+    '. Estamos atentos a su renovación.' || E'\n\n' ||
+    'Cordialmente, ' || coalesce(nullif(a.name, ''), 'Jesús Mazo') || ' – Mazoseguros' || E'\n' ||
+    'Cel. ' || coalesce(case when a.name is not null and a.name <> '' then right(a.phone, 10) end, '3103897969')
+  from (select 1) x
+  left join crm_advisors a on a.phone = regexp_replace(coalesce(p_advisor, ''), '\D', '', 'g')
+$$;
+
+-- Mensajes para el asesor: la imagen + el texto (para reenviar) y un enlace que abre el chat del cliente
+-- en el WhatsApp del asesor con el texto ya escrito.
+create or replace function crm_reminder_for_advisor(s crm_soat, p_advisor text) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_text text; v_phone text; v_base text; v_name text;
+begin
+  select coalesce(nullif(s.owner_name, ''), nullif(c.name, ''), c.wa_name), coalesce(s.owner_phone, c.phone)
+    into v_name, v_phone
+  from (select 1) x left join crm_contacts c on c.id = s.contact_id;
+  v_text := crm_reminder_text(v_name, 'SOAT', s.plate, s.end_date, p_advisor);
+  select regexp_replace(value, '/api/.*$', '') into v_base from crm_private_config where key = 'push_url';
+  return jsonb_build_array(
+    case when v_base is not null
+      then crm_msg_image(v_base || '/whatsapp/plantilla-vencimiento.jpg', v_text)
+      else crm_msg_text(v_text) end,
+    crm_msg_text(
+      case when v_phone is not null
+        then '👆 Reenvíale el mensaje de arriba, o toca aquí para escribirle desde tu WhatsApp con el texto listo:' || E'\n' ||
+             'https://wa.me/' || v_phone || '?text=' || crm_urlencode(v_text)
+        else '👆 Reenvíale el mensaje de arriba (no tengo el celular de ' || coalesce(v_name, 'este cliente') ||
+             '; agrégalo con *tel ' || s.plate || ' 300…*).' end ||
+      E'\n\nCuando lo envíes escribe *enviado ' || s.plate || '* y lo marco como contactado.'));
+end $$;
+
 -- ───────────── Modo asesor del bot ─────────────
 create or replace function crm_advisor_step(p_phone text, p_text text default null, p_reply_id text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -299,6 +351,8 @@ begin
       E'✏️ *fecha ABC123 31/12/2026* — corregir vencimiento.\n' ||
       E'📱 *tel ABC123 3001234567* — celular del cliente.\n' ||
       E'🔧 *rtm ABC123 01/04/2027* — vencimiento de la tecnomecánica.\n' ||
+      E'📨 *recordar ABC123* — te mando el recordatorio listo para reenviarlo al cliente desde tu celular.\n' ||
+      E'📨 *recordar* — los que vencen en 7 días o vencieron hace poco (hasta 5).\n' ||
       E'🎂 *cumpleaños* — clientes que cumplen en los próximos 7 días.\n' ||
       E'🧪 *modo cliente* — probar el bot como cliente (2 h).',
       jsonb_build_array(
@@ -347,6 +401,39 @@ begin
       v_out := jsonb_build_array(crm_msg_text(case when s.id is null then 'No tengo un SOAT de la placa ' || v_plate
         else E'✏️ Vencimiento actualizado\n\n' || crm_soat_text(s) end));
     end if;
+
+  elsif v_in ~ '^(recordar|recordatorio|recordatorios)$' then
+    -- Los más urgentes: vencen en 0–7 días o vencieron en los últimos 30, sin gestión cerrada
+    for s in
+      select s2.* from crm_soat s2
+      where s2.end_date between crm_today() - 30 and crm_today() + 7
+        and coalesce(s2.follow_up, '') not in ('renovado', 'perdido', 'contactado')
+        and not exists (select 1 from crm_soat n where n.plate = s2.plate and n.end_date > s2.end_date)
+      order by abs(s2.end_date - crm_today()) limit 5
+    loop
+      v_out := v_out || crm_reminder_for_advisor(s, v_phone);
+    end loop;
+    v_out := case when jsonb_array_length(v_out) = 0
+      then jsonb_build_array(crm_msg_text('✅ No hay SOAT pendientes por recordar (vencen en 7 días o vencidos en el último mes).'))
+      else jsonb_build_array(crm_msg_text('📨 Te mando ' || (jsonb_array_length(v_out) / 2) || ' recordatorio(s) para reenviar:')) || v_out end;
+
+  elsif v_raw ~* '^(recordar|recordatorio)\s' then
+    v_plate := crm_plate_norm(regexp_replace(v_raw, '^\S+\s+', ''));
+    select * into s from crm_soat where plate = v_plate order by end_date desc nulls last limit 1;
+    if s.id is null or s.end_date is null then
+      v_out := jsonb_build_array(crm_msg_text('No tengo SOAT con fecha para la placa *' || coalesce(v_plate, '?') || '*.'));
+    else
+      v_out := crm_reminder_for_advisor(s, v_phone);
+    end if;
+
+  elsif v_raw ~* '^(enviado|enviada|contactado)\s' then
+    v_plate := crm_plate_norm(regexp_replace(v_raw, '^\S+\s+', ''));
+    update crm_soat set follow_up = 'contactado', follow_up_at = now(),
+      follow_up_note = coalesce(follow_up_note, 'Recordatorio enviado por el asesor desde su WhatsApp')
+    where id = (select id from crm_soat where plate = v_plate order by end_date desc nulls last limit 1)
+    returning * into s;
+    v_out := jsonb_build_array(crm_msg_text(case when s.id is null then 'No tengo SOAT de la placa ' || coalesce(v_plate, '?')
+      else '✅ ' || s.plate || ' marcado como *contactado*.' end));
 
   elsif v_raw ~* '^(rtm|tecno|tecnomecanica|tecnomecánica)\s' then
     m := regexp_match(v_raw, '^\S+\s+([A-Za-z0-9-]{5,7})\s+(\S+)$');

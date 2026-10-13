@@ -111,12 +111,13 @@ function FollowUp({ kind, doc, phone, onChanged }) {
       setSaving(false);
     }
   };
+  // Mismo texto de la plantilla de Meta "recordatorio_vencimiento" (para enviarlo desde tu WhatsApp)
+  const due = doc.end_date || doc.expiry_date;
+  const [yy, mm, dd] = String(due || "").split("-");
   const text =
-    kind === "soat"
-      ? doc.days_left < 0
-        ? `Hola ${(doc.owner_name || "").split(" ")[0]}, te saluda Mazoseguros. Vimos que el SOAT de tu vehículo ${doc.plate} venció. ¿Te ayudamos a renovarlo hoy?`
-        : `Hola ${(doc.owner_name || "").split(" ")[0]}, te saluda Mazoseguros. El SOAT de tu vehículo ${doc.plate} vence pronto. ¿Te lo renovamos?`
-      : `Hola, te saluda Mazoseguros. La revisión técnico-mecánica del vehículo ${doc.plate} vence pronto. ¿Te ayudamos a agendarla?`;
+    `Cordial saludo Sr/Sra ${doc.owner_name || doc.contact_name || "cliente"}, le recordamos que el ${kind === "soat" ? "SOAT" : "revisión técnico-mecánica"} ` +
+    `del vehículo de placa ${doc.plate} ${doc.days_left < 0 ? "venció" : "vence"} el ${dd}/${mm}/${yy}. Estamos atentos a su renovación.\n\n` +
+    `Cordialmente, Jesús Mazo – Mazoseguros\nCel. 3103897969`;
   return (
     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-dashed border-border">
       <select

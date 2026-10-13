@@ -130,6 +130,7 @@ create or replace function crm_msg_plain(p_msg jsonb) returns text language sql 
     when 'list' then concat_ws(E'\n', p_msg ->> 'title', p_msg ->> 'body')
       || E'\n' || (select string_agg('• ' || (o ->> 'title'), E'\n')
                    from jsonb_array_elements(p_msg -> 'items') s, jsonb_array_elements(s -> 'options') o)
+    when 'image' then '[imagen] ' || coalesce(p_msg ->> 'caption', '')
     else p_msg::text end
 $$;
 
