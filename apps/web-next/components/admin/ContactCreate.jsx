@@ -25,7 +25,7 @@ const ALIASES = {
   // Póliza (opcional): si la fila trae aseguradora, se crea/actualiza la póliza del cliente
   aseguradora: ["aseguradora", "compania", "compania aseguradora", "insurer"],
   numero_poliza: ["numero poliza", "numero de poliza", "no poliza", "poliza", "policy number"],
-  ramo: ["ramo", "linea", "tipo de poliza", "tipo poliza", "line"],
+  ramo: ["ramo", "tipo de poliza", "tipo poliza", "line"],
   producto: ["producto", "plan", "product"],
   bien_asegurado: ["bien asegurado", "vehiculo", "riesgo", "insured item"],
   fecha_expedicion: ["fecha expedicion", "expedicion", "issue date"],
@@ -34,6 +34,20 @@ const ALIASES = {
   prima: ["prima", "valor prima", "premium"],
   ruta_archivo: ["ruta archivo", "ruta", "file path"],
   enlace_archivo: ["enlace archivo", "enlace", "link", "file url"],
+  // Vehículo (opcional): si la fila trae placa + vencimientos, se guardan el SOAT y la tecnomecánica
+  placa: ["placa", "plate"],
+  clase: ["clase", "clase vehiculo", "tipo vehiculo"],
+  marca: ["marca"],
+  linea: ["linea", "linea vehiculo", "referencia"],
+  modelo: ["modelo", "ano modelo"],
+  soat_aseguradora: ["soat aseguradora", "aseguradora soat"],
+  soat_poliza: ["soat poliza", "poliza soat", "numero soat"],
+  soat_inicio: ["soat inicio", "inicio soat"],
+  soat_vence: ["soat vence", "vencimiento soat", "soat vencimiento", "fin soat"],
+  rtm_vence: ["rtm vence", "vencimiento rtm", "tecnomecanica vence", "vencimiento tecnomecanica"],
+  rtm_certificado: ["rtm certificado", "certificado rtm"],
+  rtm_cda: ["rtm cda", "cda"],
+  rtm_expedicion: ["rtm expedicion", "expedicion rtm"],
 };
 
 const norm = (s) =>
@@ -355,7 +369,7 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
                   <th className="p-2">Teléfono</th>
                   <th className="p-2">Correo</th>
                   <th className="p-2">Ciudad</th>
-                  <th className="p-2">Póliza</th>
+                  <th className="p-2">Póliza / vehículo</th>
                   <th className="p-2"></th>
                 </tr>
               </thead>
@@ -369,7 +383,11 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
                     <td className="p-2">{r.email}</td>
                     <td className="p-2">{r.ciudad}</td>
                     <td className="p-2">
-                      {r.aseguradora ? [r.aseguradora, r.numero_poliza, r.fin_vigencia && `vence ${r.fin_vigencia}`].filter(Boolean).join(" · ") : ""}
+                      {[
+                        r.aseguradora && [r.aseguradora, r.numero_poliza, r.fin_vigencia && `vence ${r.fin_vigencia}`].filter(Boolean).join(" "),
+                        r.placa && r.soat_vence && `SOAT ${r.placa} ${r.soat_vence}`,
+                        r.placa && r.rtm_vence && `RTM ${r.placa} ${r.rtm_vence}`,
+                      ].filter(Boolean).join(" · ")}
                     </td>
                     <td className="p-2 text-danger">{checks[i]}</td>
                   </tr>

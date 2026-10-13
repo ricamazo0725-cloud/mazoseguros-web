@@ -8,6 +8,8 @@
 --     aseguradora, numero_poliza, ramo, producto, bien_asegurado, fecha_expedicion, inicio_vigencia,
 --     fin_vigencia, prima, estado (de la póliza: vigente, renovada, cancelada, vencida, cotizacion),
 --     ruta_archivo, enlace_archivo, notas (de la póliza). Para el cliente: estado_cliente, notas_cliente.
+--   Vehículo (si trae "placa"): SOAT con soat_vence (+ soat_aseguradora, soat_poliza, soat_inicio) y
+--     tecnomecánica con rtm_vence (+ rtm_certificado, rtm_cda, rtm_expedicion); clase, marca, linea, modelo.
 --   p_mode: 'manual'  → un cliente creado desde el formulario; si ya existe NO se toca y se avisa.
 --           'import'  → carga masiva; si ya existe se completan los datos vacíos.
 -- Empareja como la importación de pólizas: primero por documento, luego por teléfono.
@@ -59,7 +61,7 @@ declare
   v_contact uuid; v_other_doc text; v_other_name text; v_note text;
   v_by_doc uuid;
   v_has_policy boolean; v_notes text; v_pol_status text; v_line text; v_existing uuid; v_pol_txt text;
-  v_issue date; v_pstart date; v_pend date; v_birth date;
+  v_issue date; v_pstart date; v_pend date; v_birth date; v_plate text; v_sid uuid;
 begin
   if auth.role() <> 'authenticated' then raise exception 'no autorizado'; end if;
   if jsonb_typeof(p_rows) <> 'array' then raise exception 'se esperaba una lista de clientes'; end if;
@@ -207,6 +209,43 @@ begin
           v_pol_txt := ' + póliza actualizada';
         end if;
         v_pol_txt := v_pol_txt || ' (' || btrim(r ->> 'aseguradora') || coalesce(' ' || nullif(btrim(r ->> 'numero_poliza'), ''), '') || ')';
+      end if;
+
+      -- Vehículo: SOAT y tecnomecánica (crm_soat.sql / crm_vehicle_reminders.sql)
+      v_plate := crm_plate_norm(r ->> 'placa');
+      if v_plate is not null and nullif(btrim(r ->> 'soat_vence'), '') is not null then
+        if to_regclass('public.crm_soat') is null then raise exception 'falta activar el SOAT (crm_soat.sql)'; end if;
+        v_sid := null;
+        select x.id into v_sid from crm_soat x where x.plate = v_plate and x.end_date = crm_parse_date(r ->> 'soat_vence');
+        if v_sid is null then
+          insert into crm_soat (contact_id, plate, vehicle_class, brand, model_line, model_year, owner_name, owner_doc_type,
+                                owner_doc, owner_phone, owner_city, insurer, policy_number, start_date, end_date, created_by)
+          values (v_contact, v_plate, nullif(btrim(r ->> 'clase'), ''), nullif(btrim(r ->> 'marca'), ''),
+                  nullif(btrim(r ->> 'linea'), ''), nullif(regexp_replace(coalesce(r ->> 'modelo', ''), '\D', '', 'g'), '')::int,
+                  v_name, nullif(upper(btrim(r ->> 'tipo_documento')), ''), v_doc, v_phone, nullif(btrim(r ->> 'ciudad'), ''),
+                  nullif(btrim(r ->> 'soat_aseguradora'), ''), nullif(btrim(r ->> 'soat_poliza'), ''),
+                  crm_parse_date(r ->> 'soat_inicio'), crm_parse_date(r ->> 'soat_vence'), 'import');
+          v_pol_txt := v_pol_txt || ' + SOAT ' || v_plate;
+        else
+          update crm_soat s set contact_id = coalesce(s.contact_id, v_contact),
+            insurer = coalesce(nullif(btrim(r ->> 'soat_aseguradora'), ''), s.insurer),
+            policy_number = coalesce(nullif(btrim(r ->> 'soat_poliza'), ''), s.policy_number),
+            start_date = coalesce(crm_parse_date(r ->> 'soat_inicio'), s.start_date), updated_at = now()
+          where s.id = v_sid;
+          v_pol_txt := v_pol_txt || ' + SOAT ' || v_plate || ' (ya estaba)';
+        end if;
+      end if;
+      if v_plate is not null and nullif(btrim(r ->> 'rtm_vence'), '') is not null then
+        if to_regclass('public.crm_rtm') is null then raise exception 'falta activar la tecnomecánica (crm_vehicle_reminders.sql)'; end if;
+        insert into crm_rtm (contact_id, plate, certificate_number, center_name, issue_date, expiry_date, created_by)
+        values (v_contact, v_plate, nullif(btrim(r ->> 'rtm_certificado'), ''), nullif(btrim(r ->> 'rtm_cda'), ''),
+                crm_parse_date(r ->> 'rtm_expedicion'), crm_parse_date(r ->> 'rtm_vence'), 'import')
+        on conflict (plate, expiry_date) do update set
+          contact_id = coalesce(crm_rtm.contact_id, excluded.contact_id),
+          certificate_number = coalesce(excluded.certificate_number, crm_rtm.certificate_number),
+          center_name = coalesce(excluded.center_name, crm_rtm.center_name),
+          issue_date = coalesce(excluded.issue_date, crm_rtm.issue_date);
+        v_pol_txt := v_pol_txt || ' + RTM ' || v_plate;
       end if;
 
       contact_id := v_contact;
