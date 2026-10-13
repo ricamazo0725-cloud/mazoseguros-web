@@ -45,7 +45,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const [counts, setCounts] = useState(null);
   const [total, setTotal] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
-  const activeFilters = [status, source, advisor].filter(Boolean).length + (sort !== "recientes" ? 1 : 0);
+  const activeFilters = [status, source].filter(Boolean).length + (sort !== "recientes" ? 1 : 0);
   useEffect(() => {
     listAdvisorNames().then(setAdvisorNames).catch(() => {});
   }, []);
@@ -143,6 +143,20 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
           </button>
         </div>
 
+        <select
+          className={`${input} ${advisor ? "border-accent text-accent" : ""}`}
+          value={advisor}
+          onChange={(e) => setAdvisor(e.target.value)}
+        >
+          <option value="">👤 Todos los asesores</option>
+          <option value="__none">Sin asesor asignado</option>
+          {advisorNames.map((n) => (
+            <option key={n} value={n}>
+              👤 {n}
+            </option>
+          ))}
+        </select>
+
         {showFilters && (
           <div className="space-y-2 doc-card p-3">
             <select className={input} value={sort} onChange={(e) => setSort(e.target.value)}>
@@ -168,21 +182,11 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
                 </option>
               ))}
             </select>
-            <select className={input} value={advisor} onChange={(e) => setAdvisor(e.target.value)}>
-              <option value="">Todos los asesores</option>
-              <option value="__none">Sin asesor asignado</option>
-              {advisorNames.map((n) => (
-                <option key={n} value={n}>
-                  👤 {n}
-                </option>
-              ))}
-            </select>
             {activeFilters > 0 && (
               <button
                 onClick={() => {
                   setStatus("");
                   setSource("");
-                  setAdvisor("");
                   setSort("recientes");
                 }}
                 className="text-xs font-mono text-muted hover:text-accent"
@@ -202,6 +206,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
           <span>
             {total} {total === 1 ? "contacto" : "contactos"}
             {segment ? ` · ${SEGMENTS[segment]}` : ""}
+            {advisor ? ` · ${advisor === "__none" ? "sin asesor" : advisor}` : ""}
           </span>
           {total > contacts.length && <span>mostrando {contacts.length}</span>}
         </div>

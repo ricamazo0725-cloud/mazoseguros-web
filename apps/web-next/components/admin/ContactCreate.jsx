@@ -286,6 +286,7 @@ export function NewContactForm({ onCreated, onOpen, onCancel }) {
 export function ContactImport({ onDone, onOpen, onCancel }) {
   const [text, setText] = useState("");
   const [soloSoat, setSoloSoat] = useState(false);
+  const [bulkAdvisor, setBulkAdvisor] = useState("");
   const [xlsx, setXlsx] = useState(null); // { file, sheets, sheet }
   const [fileName, setFileName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -371,7 +372,7 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
     setResults(null);
     try {
       // En modo solo SOAT se omiten las filas sin placa o sin vencimiento (no tendría a qué recordar)
-      const rows = parsed.rows.filter((_, i) => !soloSoat || !checks[i]).map((r) => ({ ...r }));
+      const rows = parsed.rows.filter((_, i) => !soloSoat || !checks[i]).map((r) => ({ ...r, ...(bulkAdvisor.trim() && !r.asesor ? { asesor: bulkAdvisor.trim() } : {}) }));
       const res = await importContacts(rows, "import", (done, total) => setProgress({ done, total }));
       setResults(res);
       onDone?.();
@@ -442,6 +443,16 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
           vencimiento con la plantilla de WhatsApp. No se crean pólizas.
         </span>
       </label>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label className={label}>Asesor para estos clientes</label>
+        <input
+          className={`${input} max-w-xs`}
+          list="crm-advisor-names"
+          placeholder="(opcional) se asigna a las filas sin asesor"
+          value={bulkAdvisor}
+          onChange={(e) => setBulkAdvisor(e.target.value)}
+        />
+      </div>
       {parsed.error && <p className="text-xs text-danger font-mono">{parsed.error}</p>}
 
       {parsed.rows.length > 0 && !results && (
@@ -501,6 +512,12 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
 
       {results && (
         <div className="space-y-2">
+          {soloSoat && (summary.creado || summary.actualizado) && !results.some((r) => /SOAT/.test(r.detalle || "")) && (
+            <p className="text-xs text-danger font-mono doc-card p-3">
+              ⚠️ Los clientes se guardaron pero sin SOAT: la base de datos tiene una versión vieja del importador. Ejecuta
+              crm_soat.sql y crm_contacts_import.sql en Supabase y vuelve a importar el archivo (no se duplica nada).
+            </p>
+          )}
           <p className="text-sm font-mono">
             ✅ {summary.creado || 0} creados · 🔄 {summary.actualizado || 0} actualizados
             {summary.error ? <span className="text-danger"> · ❌ {summary.error} con error</span> : null}
