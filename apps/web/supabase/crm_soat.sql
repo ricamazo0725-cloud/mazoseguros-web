@@ -95,11 +95,19 @@ create or replace function crm_today() returns date language sql stable as $$
 $$;
 
 -- Estado calculado: renovado si hay un SOAT posterior de la misma placa
+-- Gestión comercial del vencimiento (para recuperar los vencidos y no perder renovaciones)
+alter table crm_soat add column if not exists follow_up text
+  check (follow_up in ('contactado', 'cotizado', 'renovado', 'perdido'));
+alter table crm_soat add column if not exists follow_up_note text;
+alter table crm_soat add column if not exists follow_up_at timestamptz;
+alter table crm_contacts add column if not exists advisor text;
+
 drop view if exists crm_soat_view;  -- se recrea (s.* cambia si se agregan columnas)
 create or replace view crm_soat_view with (security_invoker = true) as
 select s.*,
   coalesce(nullif(c.name, ''), c.wa_name) as contact_name,
   c.phone as contact_phone,
+  c.advisor,
   s.end_date - crm_today() as days_left,
   case
     when exists (select 1 from crm_soat n where n.plate = s.plate and n.end_date > s.end_date) then 'renovado'

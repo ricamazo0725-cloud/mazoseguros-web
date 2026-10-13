@@ -83,7 +83,17 @@ export const SORTS = {
 
 let viewMissing = false; // si aún no se corrió crm_contacts_view.sql se usa la tabla
 
-export async function listContacts({ search = "", status = "", source = "", advisor = "", segment = "", sort = "recientes" } = {}) {
+export const DUE_FILTERS = {
+  "": "Cualquier vencimiento",
+  vencido: "⛔ Con algo vencido",
+  d30: "⏳ Vence en ≤ 30 días",
+  d60: "📅 Vence en ≤ 60 días",
+};
+
+export async function listContacts({
+  search = "", status = "", source = "", advisor = "", segment = "", sort = "recientes",
+  due = "", insurer = "", chats = false, unread = false, attention = "",
+} = {}) {
   const table = viewMissing ? "crm_contacts" : "crm_contacts_view";
   let q = need().from(table).select("*", { count: "exact" }).limit(500);
   if (sort === "nombre") q = q.order("name", { ascending: true, nullsFirst: false });
@@ -91,6 +101,16 @@ export async function listContacts({ search = "", status = "", source = "", advi
   else if (sort === "vencimiento" && !viewMissing) q = q.order("next_days", { ascending: true, nullsFirst: false });
   else q = q.order("last_message_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
   if (segment && !viewMissing) q = q.eq("segment", segment);
+  if (!viewMissing) {
+    if (due === "vencido") q = q.lt("next_days", 0);
+    else if (due === "d30") q = q.gte("next_days", 0).lte("next_days", 30);
+    else if (due === "d60") q = q.gte("next_days", 0).lte("next_days", 60);
+    if (insurer) q = q.ilike("insurers", `%${insurer}%`);
+  }
+  if (chats) q = q.not("last_message_at", "is", null);
+  if (unread) q = q.gt("unread_count", 0);
+  if (attention === "asesor") q = q.eq("bot_state", "asesor");
+  else if (attention === "bot") q = q.or("bot_state.is.null,bot_state.neq.asesor");
   if (status) q = q.eq("status", status);
   if (source) q = q.eq("lead_source", source);
   if (advisor === "__none") q = q.is("advisor", null);
@@ -106,7 +126,7 @@ export async function listContacts({ search = "", status = "", source = "", advi
   const { data, error, count } = await q;
   if (error && !viewMissing && /crm_contacts_view|soat_plates|segment|next_days/.test(error.message || "")) {
     viewMissing = true;
-    return listContacts({ search, status, source, advisor, segment, sort });
+    return listContacts({ search, status, source, advisor, segment, sort, due, insurer, chats, unread, attention });
   }
   if (error) throw error;
   const rows = data ?? [];
@@ -367,4 +387,11 @@ export async function sendVoiceNote(contactId, blob) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
   return body;
+}
+
+// Cuántas conversaciones tienen mensajes sin leer (para el menú)
+export async function unreadConversations() {
+  const { count, error } = await need().from("crm_contacts").select("id", { count: "exact", head: true }).gt("unread_count", 0);
+  if (error) throw error;
+  return count || 0;
 }

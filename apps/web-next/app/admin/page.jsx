@@ -12,9 +12,36 @@ import AgendaPanel from "@/components/admin/AgendaPanel";
 import PushToggle from "@/components/admin/PushToggle";
 import PoliciesPanel from "@/components/admin/PoliciesPanel";
 import SoatPanel from "@/components/admin/SoatPanel";
+import InboxPanel from "@/components/admin/InboxPanel";
+import DashboardPanel from "@/components/admin/DashboardPanel";
+import { unreadConversations } from "@/lib/crm";
 import { registerAdminSW } from "@/lib/push";
 
-const TABS = ["CRM", "Pólizas", "SOAT", "Agenda", "Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
+// Menú lateral (estilo bandeja: Conversaciones · Clientes · Tablero …)
+const NAV = [
+  { key: "Conversaciones", icon: "M4 5h16v10H8l-4 4V5z", group: "crm" },
+  { key: "Clientes", icon: "M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM4 21c0-4 4-6 8-6s8 2 8 6", group: "crm" },
+  { key: "Tablero", icon: "M4 20V10m6 10V4m6 16v-7m4 7H2", group: "crm" },
+  { key: "SOAT", icon: "M5 16l1.5-5h11L19 16M5 16h14v3H5zM7.5 19v1.5M16.5 19v1.5M8 11l1.5-4h5L16 11", group: "crm" },
+  { key: "Pólizas", icon: "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6", group: "crm" },
+  { key: "Agenda", icon: "M5 5h14v15H5zM5 9h14M9 3v4M15 3v4", group: "crm" },
+  { key: "Cotizaciones", icon: "M5 4h14v16l-3-2-2 2-2-2-2 2-2-2-3 2zM9 9h6M9 13h6", group: "crm" },
+  { key: "Contenido", icon: "M4 6h16M4 12h10M4 18h16", group: "site" },
+  { key: "Imágenes", icon: "M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01", group: "site" },
+  { key: "Seguros", icon: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z", group: "site" },
+  { key: "Blog", icon: "M5 4h10l4 4v12H5zM9 12h6M9 16h4", group: "site" },
+];
+const TABS = NAV.map((n) => n.key);
+// Enlaces viejos (?tab=crm) siguen funcionando
+const TAB_ALIAS = { crm: "Conversaciones" };
+
+function NavIcon({ d }) {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
 const CATEGORY_IDS = ["auto", "propiedades", "salud", "obras-civiles"];
 const CATEGORY_LABEL = { auto: "Autos", propiedades: "Propiedades", salud: "Salud", "obras-civiles": "Obras civiles" };
 
@@ -28,7 +55,19 @@ export default function AdminDashboardPage() {
 
 function Dashboard() {
   const { signOut, session } = useAuth();
-  const [tab, setTab] = useState("CRM");
+  const [tab, setTab] = useState("Conversaciones");
+  const [clientFilters, setClientFilters] = useState(null);
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    const load = () => unreadConversations().then(setUnread).catch(() => {});
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, []);
+  const openClient = useCallback((id) => {
+    setOpenContactId(id);
+    setTab("Clientes");
+  }, []);
   // Contacto que se manda desde el CRM a la pestaña Agenda con "Agendar asesoría"
   const [schedulePreset, setSchedulePreset] = useState(null);
   const clearPreset = useCallback(() => setSchedulePreset(null), []);
@@ -43,11 +82,11 @@ function Dashboard() {
       const contact = url.searchParams.get("contact");
       const t = url.searchParams.get("tab");
       if (contact) {
-        setTab("CRM");
+        setTab("Conversaciones");
         setOpenContactId(contact);
       } else if (t) {
         const plain = (x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const match = TABS.find((x) => plain(x) === plain(t));
+        const match = TAB_ALIAS[plain(t)] || TABS.find((x) => plain(x) === plain(t));
         if (match) setTab(match);
       }
     }
@@ -61,12 +100,48 @@ function Dashboard() {
     return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
   }, []);
 
+  const fullBleed = tab === "Conversaciones";
+  const NavButton = ({ n }) => (
+    <button
+      onClick={() => setTab(n.key)}
+      title={n.key}
+      className={`group relative shrink-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition focus-ring ${
+        tab === n.key ? "bg-primary-foreground/10 text-primary-foreground" : "text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/5"
+      }`}
+    >
+      {tab === n.key && <span className="hidden md:block absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-accent" />}
+      <NavIcon d={n.icon} />
+      <span className="md:hidden lg:inline whitespace-nowrap">{n.key}</span>
+      {n.key === "Conversaciones" && unread > 0 && (
+        <span className="lg:ml-auto md:absolute md:top-1 md:right-1 lg:static text-[10px] font-mono bg-accent text-accent-foreground rounded-full px-1.5 min-w-[18px] text-center">
+          {unread}
+        </span>
+      )}
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b border-border bg-primary text-primary-foreground pt-[env(safe-area-inset-top)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
-          <span className="font-display font-semibold truncate">Mazoseguros<span className="hidden sm:inline"> · Admin</span></span>
-          <div className="flex items-center gap-2">
+    <div className="h-[100dvh] flex flex-col md:flex-row bg-background">
+      {/* ── Menú lateral ── */}
+      <nav className="shrink-0 bg-primary text-primary-foreground md:w-[72px] lg:w-60 flex md:flex-col pt-[env(safe-area-inset-top)] md:pt-0">
+        <div className="hidden md:flex items-center gap-2 h-16 px-4 lg:px-5 border-b border-primary-foreground/10">
+          <span className="w-8 h-8 rounded-md bg-accent grid place-items-center font-display font-semibold">M</span>
+          <span className="hidden lg:block leading-tight">
+            <span className="block font-display font-semibold">Mazoseguros</span>
+            <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-primary-foreground/50">Admin</span>
+          </span>
+        </div>
+        <div className="flex md:flex-col gap-1 p-2 md:p-3 overflow-x-auto no-scrollbar md:overflow-y-auto md:flex-1">
+          {NAV.filter((n) => n.group === "crm").map((n) => (
+            <NavButton key={n.key} n={n} />
+          ))}
+          <p className="hidden lg:block mt-4 mb-1 px-3 text-[10px] font-mono uppercase tracking-[0.2em] text-primary-foreground/40">Sitio web</p>
+          <span className="hidden md:block lg:hidden my-2 border-t border-primary-foreground/10" />
+          {NAV.filter((n) => n.group === "site").map((n) => (
+            <NavButton key={n.key} n={n} />
+          ))}
+        </div>
+        <div className="hidden md:flex md:flex-col gap-2 p-3 border-t border-primary-foreground/10">
           <PushToggle email={session?.user?.email} />
           <button
             onClick={signOut}
@@ -74,27 +149,13 @@ function Dashboard() {
           >
             Salir
           </button>
-          </div>
         </div>
-      </header>
+      </nav>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 pb-[calc(2rem+env(safe-area-inset-bottom))]">
-        <nav className="flex gap-2 mb-6 sm:mb-10 overflow-x-auto no-scrollbar text-xs font-mono uppercase tracking-wider -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`shrink-0 px-4 py-2 rounded border focus-ring ${
-                tab === t ? "border-accent text-accent" : "border-border text-muted hover:text-foreground"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </nav>
-
-        {tab === "CRM" && (
-          <CrmPanel
+      {/* ── Contenido ── */}
+      <main className={`flex-1 min-h-0 min-w-0 ${fullBleed ? "overflow-hidden" : "overflow-y-auto thin-scroll"}`}>
+        {tab === "Conversaciones" && (
+          <InboxPanel
             initialContactId={openContactId}
             onSchedule={(contact) => {
               setSchedulePreset(contact);
@@ -102,29 +163,45 @@ function Dashboard() {
             }}
           />
         )}
-        {tab === "Pólizas" && (
-          <PoliciesPanel
-            onOpenContact={(id) => {
-              setOpenContactId(id);
-              setTab("CRM");
+        {tab === "Tablero" && (
+          <DashboardPanel
+            onOpenContact={openClient}
+            onOpenClients={(f) => {
+              setClientFilters({ ...f, at: Date.now() });
+              setOpenContactId(null);
+              setTab("Clientes");
             }}
           />
         )}
-        {tab === "SOAT" && (
-          <SoatPanel
-            onOpenContact={(id) => {
-              setOpenContactId(id);
-              setTab("CRM");
-            }}
-          />
+        {!fullBleed && tab !== "Tablero" && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+            <div className="md:hidden flex justify-end gap-2 mb-4">
+              <PushToggle email={session?.user?.email} />
+              <button onClick={signOut} className="text-xs font-mono border border-border rounded px-3 py-1.5">
+                Salir
+              </button>
+            </div>
+            {tab === "Clientes" && (
+              <CrmPanel
+                initialContactId={openContactId}
+                initialFilters={clientFilters}
+                onSchedule={(contact) => {
+                  setSchedulePreset(contact);
+                  setTab("Agenda");
+                }}
+              />
+            )}
+            {tab === "Pólizas" && <PoliciesPanel onOpenContact={openClient} />}
+            {tab === "SOAT" && <SoatPanel onOpenContact={openClient} />}
+            {tab === "Agenda" && <AgendaPanel preset={schedulePreset} onPresetUsed={clearPreset} />}
+            {tab === "Contenido" && <ContentEditor />}
+            {tab === "Imágenes" && <MediaEditor />}
+            {tab === "Seguros" && <CategoriesEditor />}
+            {tab === "Blog" && <BlogEditor />}
+            {tab === "Cotizaciones" && <QuotesViewer />}
+          </div>
         )}
-        {tab === "Agenda" && <AgendaPanel preset={schedulePreset} onPresetUsed={clearPreset} />}
-        {tab === "Contenido" && <ContentEditor />}
-        {tab === "Imágenes" && <MediaEditor />}
-        {tab === "Seguros" && <CategoriesEditor />}
-        {tab === "Blog" && <BlogEditor />}
-        {tab === "Cotizaciones" && <QuotesViewer />}
-      </div>
+      </main>
     </div>
   );
 }

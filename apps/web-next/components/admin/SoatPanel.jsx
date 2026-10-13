@@ -17,7 +17,14 @@ import {
   deleteRtm,
   sendReminderNow,
   listNotifications,
+  listVehicleDocs,
+  bucketCounts,
+  setFollowUp,
+  exportVehicleCsv,
+  BUCKETS,
+  FOLLOW_UP,
 } from "@/lib/soat";
+import { listAdvisorNames, waLink } from "@/lib/crm";
 import { fmtDate, fmtMoney, daysLabel } from "@/lib/policies";
 import { mediaUrl, fmtDateTime } from "@/lib/crm";
 
@@ -87,7 +94,81 @@ function SendNow({ kind, id }) {
   );
 }
 
-function SoatCard({ s, onEdit, onDelete, onOpenContact, showClient = true }) {
+// Gestión comercial del vencimiento + acceso directo a WhatsApp
+function FollowUp({ kind, doc, phone, onChanged }) {
+  const [val, setVal] = useState(doc.follow_up || "");
+  const [note, setNote] = useState(doc.follow_up_note || "");
+  const [edit, setEdit] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const save = async (v, n) => {
+    setSaving(true);
+    try {
+      await setFollowUp(kind, doc.id, v, n);
+      onChanged?.();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const text =
+    kind === "soat"
+      ? doc.days_left < 0
+        ? `Hola ${(doc.owner_name || "").split(" ")[0]}, te saluda Mazoseguros. Vimos que el SOAT de tu vehículo ${doc.plate} venció. ¿Te ayudamos a renovarlo hoy?`
+        : `Hola ${(doc.owner_name || "").split(" ")[0]}, te saluda Mazoseguros. El SOAT de tu vehículo ${doc.plate} vence pronto. ¿Te lo renovamos?`
+      : `Hola, te saluda Mazoseguros. La revisión técnico-mecánica del vehículo ${doc.plate} vence pronto. ¿Te ayudamos a agendarla?`;
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-dashed border-border">
+      <select
+        value={val}
+        disabled={saving}
+        onChange={(e) => {
+          setVal(e.target.value);
+          save(e.target.value, note);
+        }}
+        className={`text-[11px] font-mono rounded-full border px-2 py-1 bg-background ${
+          val === "renovado" ? "border-primary text-primary" : val === "perdido" ? "border-border text-muted line-through" : val ? "border-accent text-accent" : "border-border"
+        }`}
+      >
+        {Object.entries(FOLLOW_UP).map(([k, v]) => (
+          <option key={k} value={k}>
+            {v}
+          </option>
+        ))}
+      </select>
+      {phone && (
+        <a
+          href={`${waLink(phone)}?text=${encodeURIComponent(text)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[11px] font-mono px-2 py-1 rounded-full border border-border hover:border-accent hover:text-accent"
+        >
+          💬 WhatsApp
+        </a>
+      )}
+      <button onClick={() => setEdit((v) => !v)} className="text-[11px] font-mono text-muted hover:text-accent">
+        📝 {doc.follow_up_note ? "Nota" : "Agregar nota"}
+      </button>
+      {doc.follow_up_note && !edit && <span className="basis-full text-xs text-muted italic">“{doc.follow_up_note}”</span>}
+      {edit && (
+        <span className="basis-full flex gap-2">
+          <input className={input} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: llamar el viernes, ya renovó con otro…" />
+          <button
+            onClick={async () => {
+              await save(val, note);
+              setEdit(false);
+            }}
+            className="btn-cta text-xs px-3"
+          >
+            Guardar
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function SoatCard({ s, onEdit, onDelete, onOpenContact, showClient = true, onChanged }) {
   return (
     <div className="doc-card p-4 space-y-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -130,6 +211,7 @@ function SoatCard({ s, onEdit, onDelete, onOpenContact, showClient = true }) {
           </button>
         )}
       </div>
+      {onChanged && <FollowUp kind="soat" doc={s} phone={s.owner_phone || s.contact_phone} onChanged={onChanged} />}
     </div>
   );
 }
@@ -253,7 +335,7 @@ function SoatForm({ initial, onSaved, onCancel }) {
 }
 
 // ───────────── Tecnomecánica ─────────────
-function RtmCard({ r, onEdit, onDelete, onOpenContact, showClient = true }) {
+function RtmCard({ r, onEdit, onDelete, onOpenContact, showClient = true, onChanged }) {
   return (
     <div className="doc-card p-4 space-y-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -293,6 +375,7 @@ function RtmCard({ r, onEdit, onDelete, onOpenContact, showClient = true }) {
           </button>
         )}
       </div>
+      {onChanged && <FollowUp kind="rtm" doc={r} phone={r.contact_phone} onChanged={onChanged} />}
     </div>
   );
 }
@@ -430,20 +513,28 @@ function Advisors() {
 
 export default function SoatPanel({ onOpenContact }) {
   const [rows, setRows] = useState([]);
-  const [filter, setFilter] = useState("por_vencer");
+  const [filter, setFilter] = useState("d30");
+  const [followUp, setFollowUpFilter] = useState("all");
+  const [advisor, setAdvisor] = useState("");
+  const [advisorNames, setAdvisorNames] = useState([]);
+  const [counts, setCounts] = useState(null);
+  useEffect(() => {
+    listAdvisorNames().then(setAdvisorNames).catch(() => {});
+  }, []);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState(null); // null | {} (nuevo) | soat
   const [error, setError] = useState("");
   const [view, setView] = useState("soat"); // soat | rtm
 
   const refresh = useCallback(() => {
-    (view === "rtm" ? listRtm : listSoat)({ search, filter })
+    listVehicleDocs(view, { search, bucket: filter, followUp, advisor })
       .then((r) => {
         setRows(r);
         setError("");
       })
       .catch((e) => setError(e.message));
-  }, [search, filter, view]);
+    bucketCounts(view, { followUp, advisor }).then(setCounts).catch(() => {});
+  }, [search, filter, view, followUp, advisor]);
 
   useEffect(() => {
     const t = setTimeout(refresh, 250);
@@ -500,27 +591,58 @@ export default function SoatPanel({ onOpenContact }) {
         />
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {[
-          ["por_vencer", "Por vencer (30 d)"],
-          ["vencido", "Vencidos"],
-          ["vigente", "Vigentes"],
-          ["todos", "Todos"],
-        ].map(([k, v]) => (
+      {/* Tramos de vencimiento */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        {Object.entries(BUCKETS).map(([k, b]) => (
           <button
             key={k}
             onClick={() => setFilter(k)}
-            className={`text-xs font-mono px-3 py-1.5 rounded border ${filter === k ? "border-accent text-accent" : "border-border text-muted"}`}
+            className={`text-left rounded-lg border p-3 transition ${
+              filter === k
+                ? k === "vencido"
+                  ? "border-danger bg-danger/10"
+                  : "border-accent bg-accent/10"
+                : "border-border bg-surface hover:border-accent/50"
+            }`}
           >
-            {v}
+            <span className={`block font-display text-2xl leading-none ${k === "vencido" ? "text-danger" : k === "d7" ? "text-accent" : ""}`}>
+              {counts?.[k] ?? "—"}
+            </span>
+            <span className="block text-[11px] font-mono mt-1">{b.label}</span>
+            {b.hint && <span className="block text-[10px] text-muted">{b.hint}</span>}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
         <input
           className={`${input} max-w-xs`}
           placeholder="Placa, nombre, documento o celular"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <select className={`${input} max-w-[220px]`} value={followUp} onChange={(e) => setFollowUpFilter(e.target.value)}>
+          <option value="all">Gestión: todas</option>
+          <option value="open">Pendientes (sin cerrar)</option>
+          <option value="none">Sin gestionar</option>
+          {Object.entries(FOLLOW_UP)
+            .filter(([k]) => k)
+            .map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+        </select>
+        <select className={`${input} max-w-[200px]`} value={advisor} onChange={(e) => setAdvisor(e.target.value)}>
+          <option value="">👤 Todos los asesores</option>
+          <option value="__none">Sin asesor</option>
+          {advisorNames.map((n) => (
+            <option key={n}>{n}</option>
+          ))}
+        </select>
+        <button onClick={() => exportVehicleCsv(view, rows)} disabled={!rows.length} className={`${btn} ml-auto`}>
+          ⬇️ Exportar {rows.length} a Excel
+        </button>
       </div>
 
       {error && <p className="text-xs text-danger font-mono">{error}</p>}
@@ -533,6 +655,7 @@ export default function SoatPanel({ onOpenContact }) {
             onOpenContact={onOpenContact}
             onEdit={(x) => setEditing(x)}
             onDelete={(x) => deleteRtm(x.id).then(refresh).catch((e) => setError(e.message))}
+            onChanged={refresh}
           />
         ))}
         {view === "soat" && rows.map((s) => (
@@ -542,6 +665,7 @@ export default function SoatPanel({ onOpenContact }) {
             onOpenContact={onOpenContact}
             onEdit={(x) => setEditing(x)}
             onDelete={(x) => deleteSoat(x.id).then(refresh).catch((e) => setError(e.message))}
+            onChanged={refresh}
           />
         ))}
       </div>

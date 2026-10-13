@@ -19,20 +19,113 @@ function check({ data, error }) {
   return data;
 }
 
-export async function listSoat({ search = "", filter = "por_vencer" } = {}) {
-  let q = sb().from("crm_soat_view").select("*").limit(500);
-  if (filter === "por_vencer") q = q.eq("computed_status", "por_vencer").order("end_date", { ascending: true });
-  else if (filter === "vencido") q = q.eq("computed_status", "vencido").order("end_date", { ascending: false });
-  else if (filter === "vigente") q = q.in("computed_status", ["vigente", "por_vencer"]).order("end_date", { ascending: true });
-  else q = q.order("created_at", { ascending: false });
+// Rangos de vencimiento para filtrar (sobre days_left = días que faltan; negativo = vencido)
+export const BUCKETS = {
+  vencido: { label: "⛔ Vencidos", hint: "sin renovar" },
+  d7: { label: "🔥 Vencen ≤ 7 días", hint: "llamar ya" },
+  d30: { label: "⏳ 8 a 30 días", hint: "enviar recordatorio" },
+  d60: { label: "📅 31 a 60 días", hint: "preparar renovación" },
+  vigente: { label: "✅ Vigentes", hint: "más de 60 días" },
+  todos: { label: "Todos", hint: "" },
+};
+
+export const FOLLOW_UP = {
+  "": "Sin gestionar",
+  contactado: "Contactado",
+  cotizado: "Cotizado",
+  renovado: "Renovado con nosotros",
+  perdido: "Perdido / renovó en otro lado",
+};
+
+function applyBucket(q, bucket) {
+  if (bucket === "todos") return q;
+  q = q.neq("computed_status", "renovado");
+  if (bucket === "vencido") return q.lt("days_left", 0);
+  if (bucket === "d7") return q.gte("days_left", 0).lte("days_left", 7);
+  if (bucket === "d30") return q.gte("days_left", 8).lte("days_left", 30);
+  if (bucket === "d60") return q.gte("days_left", 31).lte("days_left", 60);
+  if (bucket === "vigente") return q.gt("days_left", 60);
+  return q;
+}
+
+function applyCommon(q, { followUp = "all", advisor = "" }) {
+  if (followUp === "none") q = q.is("follow_up", null);
+  else if (followUp === "open") q = q.or("follow_up.is.null,follow_up.in.(contactado,cotizado)");
+  else if (followUp && followUp !== "all") q = q.eq("follow_up", followUp);
+  if (advisor === "__none") q = q.is("advisor", null);
+  else if (advisor) q = q.eq("advisor", advisor);
+  return q;
+}
+
+// kind: "soat" | "rtm"
+export async function listVehicleDocs(kind, { search = "", bucket = "d30", followUp = "all", advisor = "" } = {}) {
+  const view = kind === "rtm" ? "crm_rtm_view" : "crm_soat_view";
+  const dateCol = kind === "rtm" ? "expiry_date" : "end_date";
+  let q = sb().from(view).select("*").limit(1000);
+  q = applyCommon(applyBucket(q, bucket), { followUp, advisor });
+  q = q.order(dateCol, { ascending: bucket !== "vencido", nullsFirst: false });
   const term = search.trim().replace(/[%,()]/g, "");
   if (term) {
     const plate = term.toUpperCase().replace(/[^0-9A-Z]/g, "");
     q = q.or(
-      `plate.ilike.%${plate || term}%,owner_name.ilike.%${term}%,owner_doc.ilike.%${term}%,owner_phone.ilike.%${term}%,policy_number.ilike.%${term}%`
+      kind === "rtm"
+        ? `plate.ilike.%${plate || term}%,contact_name.ilike.%${term}%,certificate_number.ilike.%${term}%,center_name.ilike.%${term}%`
+        : `plate.ilike.%${plate || term}%,owner_name.ilike.%${term}%,owner_doc.ilike.%${term}%,owner_phone.ilike.%${term}%,policy_number.ilike.%${term}%`
     );
   }
   return check(await q) ?? [];
+}
+
+export async function bucketCounts(kind, { followUp = "all", advisor = "" } = {}) {
+  const view = kind === "rtm" ? "crm_rtm_view" : "crm_soat_view";
+  const out = {};
+  await Promise.all(
+    Object.keys(BUCKETS).map(async (b) => {
+      const q = applyCommon(applyBucket(sb().from(view).select("id", { count: "exact", head: true }), b), { followUp, advisor });
+      const { count, error } = await q;
+      out[b] = error ? null : count;
+    })
+  );
+  return out;
+}
+
+export async function setFollowUp(kind, id, followUp, note) {
+  const table = kind === "rtm" ? "crm_rtm" : "crm_soat";
+  const patch = { follow_up: followUp || null, follow_up_at: new Date().toISOString() };
+  if (note !== undefined) patch.follow_up_note = note || null;
+  check(await sb().from(table).update(patch).eq("id", id));
+}
+
+// CSV (abre en Excel) con la lista que se está viendo, para llamar o hacer seguimiento
+export function exportVehicleCsv(kind, rows) {
+  const head = ["placa", "cliente", "celular", "aseguradora/CDA", "poliza/certificado", "vence", "dias", "gestion", "nota", "asesor"];
+  const lines = rows.map((r) => [
+    r.plate,
+    r.owner_name || r.contact_name || "",
+    r.owner_phone || r.contact_phone || "",
+    kind === "rtm" ? r.center_name : r.insurer,
+    kind === "rtm" ? r.certificate_number : r.policy_number,
+    kind === "rtm" ? r.expiry_date : r.end_date,
+    r.days_left,
+    FOLLOW_UP[r.follow_up || ""],
+    r.follow_up_note,
+    r.advisor,
+  ]);
+  const esc = (v) => {
+    const t = v == null ? "" : String(v);
+    return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const csv = "\uFEFF" + [head, ...lines].map((l) => l.map(esc).join(";")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `${kind === "rtm" ? "tecnomecanica" : "soat"}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Compatibilidad con llamadas anteriores
+export async function listSoat({ search = "", filter = "d30" } = {}) {
+  return listVehicleDocs("soat", { search, bucket: filter });
 }
 
 export async function soatForContact(contactId) {
@@ -118,18 +211,8 @@ export async function setAdvisorActive(phone, active) {
 }
 
 // ───────────── Tecnomecánica (crm_rtm, ver crm_vehicle_reminders.sql) ─────────────
-export async function listRtm({ search = "", filter = "por_vencer" } = {}) {
-  let q = sb().from("crm_rtm_view").select("*").limit(500);
-  if (filter === "por_vencer") q = q.eq("computed_status", "por_vencer").order("expiry_date", { ascending: true });
-  else if (filter === "vencido") q = q.eq("computed_status", "vencido").order("expiry_date", { ascending: false });
-  else if (filter === "vigente") q = q.in("computed_status", ["vigente", "por_vencer"]).order("expiry_date", { ascending: true });
-  else q = q.order("created_at", { ascending: false });
-  const term = search.trim().replace(/[%,()]/g, "");
-  if (term) {
-    const plate = term.toUpperCase().replace(/[^0-9A-Z]/g, "");
-    q = q.or(`plate.ilike.%${plate || term}%,contact_name.ilike.%${term}%,certificate_number.ilike.%${term}%,center_name.ilike.%${term}%`);
-  }
-  return check(await q) ?? [];
+export async function listRtm({ search = "", filter = "d30" } = {}) {
+  return listVehicleDocs("rtm", { search, bucket: filter });
 }
 
 export async function rtmForContact(contactId) {

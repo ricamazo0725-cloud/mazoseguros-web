@@ -53,11 +53,19 @@ drop trigger if exists crm_rtm_defaults on crm_rtm;
 create trigger crm_rtm_defaults before insert or update on crm_rtm
   for each row execute function crm_trg_rtm_defaults();
 
+-- Gestión comercial del vencimiento (para recuperar los vencidos y no perder renovaciones)
+alter table crm_rtm add column if not exists follow_up text
+  check (follow_up in ('contactado', 'cotizado', 'renovado', 'perdido'));
+alter table crm_rtm add column if not exists follow_up_note text;
+alter table crm_rtm add column if not exists follow_up_at timestamptz;
+alter table crm_contacts add column if not exists advisor text;
+
 drop view if exists crm_rtm_view;  -- se recrea (s.* cambia si se agregan columnas)
 create or replace view crm_rtm_view with (security_invoker = true) as
 select r.*,
   coalesce(nullif(c.name, ''), c.wa_name) as contact_name,
   c.phone as contact_phone,
+  c.advisor,
   r.expiry_date - crm_today() as days_left,
   case
     when exists (select 1 from crm_rtm n where n.plate = r.plate and n.expiry_date > r.expiry_date) then 'renovado'
@@ -70,6 +78,10 @@ left join crm_contacts c on c.id = r.contact_id;
 
 -- ───────────── Avisos al cliente ─────────────
 alter table crm_soat add column if not exists client_reminders_sent int[] not null default '{}';
+alter table crm_soat add column if not exists follow_up text
+  check (follow_up in ('contactado', 'cotizado', 'renovado', 'perdido'));
+alter table crm_soat add column if not exists follow_up_note text;
+alter table crm_soat add column if not exists follow_up_at timestamptz;
 alter table crm_contacts add column if not exists notify_opt_out boolean not null default false;
 
 -- Si cambia el vencimiento de un SOAT, los avisos al cliente vuelven a empezar
@@ -110,10 +122,12 @@ returns jsonb language sql stable security definer set search_path = public as $
            s.insurer as extra, s.client_reminders_sent as sent
     from crm_soat s
     where not exists (select 1 from crm_soat n where n.plate = s.plate and n.end_date > s.end_date)
+      and (p_id is not null or coalesce(s.follow_up, '') not in ('renovado', 'perdido'))
     union all
     select 'rtm', r.id, r.plate, r.expiry_date, r.contact_id, null, null, r.center_name, r.client_reminders_sent
     from crm_rtm r
     where not exists (select 1 from crm_rtm n where n.plate = r.plate and n.expiry_date > r.expiry_date)
+      and (p_id is not null or coalesce(r.follow_up, '') not in ('renovado', 'perdido'))
   ), due as (
     select i.*, i.expiry - crm_today() as days_left,
       (select min(d) from unnest(array[30, 15, 3]) d where i.expiry - crm_today() <= d and not (d = any (i.sent))) as threshold

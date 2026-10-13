@@ -33,14 +33,27 @@ import {
 const input = "w-full bg-background border border-border rounded px-3 py-2 text-sm focus-ring";
 const label = "text-xs font-mono uppercase tracking-wider text-muted";
 
-export default function CrmPanel({ onSchedule, initialContactId }) {
+export const INSURERS = [
+  "SURA", "AXA Colpatria", "Seguros Mundial", "HDI (Liberty)", "La Previsora", "Seguros del Estado", "Seguros Bolívar",
+  "Allianz", "La Equidad", "Solidaria", "Mapfre", "Qualitas", "SBS", "Zurich", "Chubb",
+];
+
+export default function CrmPanel({ onSchedule, initialContactId, initialFilters }) {
   const [contacts, setContacts] = useState([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [source, setSource] = useState("");
   const [advisor, setAdvisor] = useState("");
   const [advisorNames, setAdvisorNames] = useState([]);
-  const [segment, setSegment] = useState("");
+  const [segment, setSegment] = useState(initialFilters?.segment || "");
+  const [due, setDue] = useState(initialFilters?.due || "");
+  const [insurer, setInsurer] = useState(initialFilters?.insurer || "");
+  useEffect(() => {
+    if (!initialFilters) return;
+    setSegment(initialFilters.segment || "");
+    setDue(initialFilters.due || "");
+    setInsurer(initialFilters.insurer || "");
+  }, [initialFilters]);
   const [sort, setSort] = useState("recientes");
   const [counts, setCounts] = useState(null);
   const [total, setTotal] = useState(0);
@@ -54,7 +67,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const [mode, setMode] = useState(null); // null | "new" | "import"
 
   const refresh = useCallback(() => {
-    listContacts({ search, status, source, advisor, segment, sort })
+    listContacts({ search, status, source, advisor, segment, sort, due, insurer })
       .then((rows) => {
         setContacts(rows);
         setTotal(rows.total ?? rows.length);
@@ -62,7 +75,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
       })
       .catch((e) => setError(e.message));
     segmentCounts().then(setCounts).catch(() => {});
-  }, [search, status, source, advisor, segment, sort]);
+  }, [search, status, source, advisor, segment, sort, due, insurer]);
 
   useEffect(() => {
     const t = setTimeout(refresh, 250); // espera a que termine de escribir
@@ -157,6 +170,41 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
           ))}
         </select>
 
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            ["", "Todo"],
+            ["vencido", "⛔ Vencidos"],
+            ["d30", "⏳ ≤ 30 días"],
+            ["d60", "📅 ≤ 60 días"],
+          ].map(([k, v]) => (
+            <button
+              key={k || "all"}
+              onClick={() => setDue(k)}
+              className={`text-[11px] font-mono px-2.5 py-1 rounded-full border transition ${
+                due === k
+                  ? k === "vencido"
+                    ? "border-danger bg-danger/10 text-danger"
+                    : "border-accent bg-accent/10 text-accent"
+                  : "border-border text-muted hover:text-foreground"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+          <select
+            value={insurer}
+            onChange={(e) => setInsurer(e.target.value)}
+            className={`text-[11px] font-mono px-2 py-1 rounded-full border bg-background ${insurer ? "border-accent text-accent" : "border-border text-muted"}`}
+          >
+            <option value="">🏢 Aseguradora</option>
+            {INSURERS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {showFilters && (
           <div className="space-y-2 doc-card p-3">
             <select className={input} value={sort} onChange={(e) => setSort(e.target.value)}>
@@ -207,6 +255,8 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
             {total} {total === 1 ? "contacto" : "contactos"}
             {segment ? ` · ${SEGMENTS[segment]}` : ""}
             {advisor ? ` · ${advisor === "__none" ? "sin asesor" : advisor}` : ""}
+            {insurer ? ` · ${insurer}` : ""}
+            {due === "vencido" ? " · vencidos" : due ? ` · vence ≤ ${due.slice(1)} d` : ""}
           </span>
           {total > contacts.length && <span>mostrando {contacts.length}</span>}
         </div>
@@ -290,7 +340,7 @@ function dueChip(c) {
   return <span className={`text-[10px] font-mono border rounded px-1.5 py-0.5 ${cls}`}>{KIND[c.next_kind] || ""} {when}</span>;
 }
 
-function ContactRow({ c, active, onClick }) {
+export function ContactRow({ c, active, onClick, compact = false }) {
   const name = c.name || c.wa_name || (c.phone ? `+${c.phone}` : "Sin nombre");
   const seg = SEGMENT_CHIP[c.segment];
   return (
@@ -345,7 +395,7 @@ function ContactRow({ c, active, onClick }) {
   );
 }
 
-function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
+export function ClientSheet({ contact, onSaved, onSchedule, onDeleted, compact = false }) {
   const [form, setForm] = useState({
     name: contact.name || "",
     email: contact.email || "",
@@ -364,24 +414,6 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const bottomRef = useRef(null);
-
-  const loadMessages = useCallback(() => {
-    getMessages(contact.id).then(setMessages).catch(() => {});
-  }, [contact.id]);
-
-  useEffect(() => {
-    loadMessages();
-    if (contact.unread_count > 0) markRead(contact.id).then(onSaved).catch(() => {});
-    const t = setInterval(loadMessages, 15000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contact.id]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "nearest" });
-  }, [messages.length]);
 
   async function save() {
     setSaveError("");
@@ -440,7 +472,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
 
   return (
     <div className="space-y-6">
-      <div className="doc-card p-6 space-y-4">
+      <div className={`doc-card ${compact ? "p-4" : "p-6"} space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display font-semibold text-lg">{contact.name || contact.wa_name || "Sin nombre"}</h2>
@@ -469,7 +501,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
 
         <LeadHistory contactId={contact.id} />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={`grid gap-4 ${compact ? "" : "sm:grid-cols-2"}`}>
           <div className="space-y-1">
             <label className={label}>Nombre</label>
             <input className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -609,9 +641,35 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
       <ContactPolicies contactId={contact.id} />
       <ContactSoat contactId={contact.id} />
 
-      <div className="doc-card p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <h3 className="font-display font-semibold">Conversación</h3>
+    </div>
+  );
+}
+
+// Conversación de WhatsApp con el cliente (mensajes + respuesta). fill = ocupa todo el alto del panel.
+export function ChatThread({ contact, onSaved, fill = false, header = null }) {
+  const [messages, setMessages] = useState([]);
+  const bottomRef = useRef(null);
+
+  const loadMessages = useCallback(() => {
+    getMessages(contact.id).then(setMessages).catch(() => {});
+  }, [contact.id]);
+
+  useEffect(() => {
+    loadMessages();
+    if (contact.unread_count > 0) markRead(contact.id).then(onSaved).catch(() => {});
+    const t = setInterval(loadMessages, 15000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact.id]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "nearest" });
+  }, [messages.length]);
+
+  return (
+      <div className={fill ? "h-full flex flex-col min-h-0" : "doc-card p-4 sm:p-6"}>
+        <div className={`flex flex-wrap items-center justify-between gap-2 ${fill ? "px-4 py-3 border-b border-border" : "mb-4"}`}>
+          {header || <h3 className="font-display font-semibold">Conversación</h3>}
           <div className="flex items-center gap-3">
             <BotSwitch contact={contact} onChanged={onSaved} />
             <button onClick={loadMessages} className="text-xs font-mono text-muted hover:text-accent">
@@ -619,13 +677,15 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
             </button>
           </div>
         </div>
-        <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+        <div className={fill ? "flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-2 chat-bg" : "space-y-2 max-h-[55vh] overflow-y-auto pr-1"}>
           {messages.length === 0 && <p className="text-sm text-muted font-mono">Sin mensajes registrados.</p>}
           {messages.map((m) => (
             <div key={m.id} className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[80%] rounded px-3 py-2 text-sm whitespace-pre-wrap ${
-                  m.direction === "out" ? "bg-primary text-primary-foreground" : "bg-surface-2"
+                className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap shadow-sm ${
+                  m.direction === "out"
+                    ? "bg-primary text-primary-foreground rounded-br-md"
+                    : "bg-surface border border-border rounded-bl-md"
                 }`}
               >
                 {isMediaMessage(m) && <MessageMedia m={m} />}
@@ -639,6 +699,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
           ))}
           <div ref={bottomRef} />
         </div>
+        <div className={fill ? "border-t border-border px-4 py-3 bg-surface" : ""}>
         <ReplyBox
           contactId={contact.id}
           messages={messages}
@@ -647,7 +708,17 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
             onSaved();
           }}
         />
+        </div>
       </div>
+  );
+}
+
+// Hoja del cliente + conversación, una debajo de la otra (vista Clientes)
+function ContactDetail(props) {
+  return (
+    <div className="space-y-6">
+      <ClientSheet {...props} />
+      <ChatThread contact={props.contact} onSaved={props.onSaved} />
     </div>
   );
 }
