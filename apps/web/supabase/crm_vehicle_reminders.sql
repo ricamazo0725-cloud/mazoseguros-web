@@ -126,7 +126,8 @@ returns jsonb language sql stable security definer set search_path = public as $
   select coalesce(jsonb_agg(jsonb_build_object(
       'kind', d.kind, 'id', d.id, 'plate', d.plate, 'expiry', d.expiry, 'days_left', d.days_left,
       'threshold', coalesce(d.threshold, 0), 'extra', d.extra, 'contact_id', c.id,
-      'name', coalesce(nullif(c.name, ''), c.wa_name, d.owner_name),
+      -- el tomador del SOAT primero: un mismo celular puede ser de varias personas/empresas
+      'name', coalesce(nullif(d.owner_name, ''), nullif(c.name, ''), c.wa_name),
       'phone', coalesce(c.phone, crm_norm_phone(d.owner_phone)),
       'email', nullif(btrim(c.email), ''),
       'opt_out', coalesce(c.notify_opt_out, false)) order by d.expiry), '[]'::jsonb)

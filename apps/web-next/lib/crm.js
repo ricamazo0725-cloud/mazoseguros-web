@@ -67,19 +67,66 @@ function check({ data, error }) {
 
 // ───────────── Contactos y mensajes ─────────────
 
-export async function listContacts({ search = "", status = "", source = "", advisor = "" } = {}) {
-  let q = need()
-    .from("crm_contacts")
-    .select("*")
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .limit(200);
+export const SEGMENTS = {
+  "": "Todos",
+  cliente: "Clientes",
+  solo_soat: "Solo SOAT",
+  prospecto: "Prospectos",
+};
+
+export const SORTS = {
+  recientes: "Conversación más reciente",
+  vencimiento: "Próximo vencimiento",
+  nombre: "Nombre (A-Z)",
+  creados: "Agregados recientemente",
+};
+
+let viewMissing = false; // si aún no se corrió crm_contacts_view.sql se usa la tabla
+
+export async function listContacts({ search = "", status = "", source = "", advisor = "", segment = "", sort = "recientes" } = {}) {
+  const table = viewMissing ? "crm_contacts" : "crm_contacts_view";
+  let q = need().from(table).select("*", { count: "exact" }).limit(500);
+  if (sort === "nombre") q = q.order("name", { ascending: true, nullsFirst: false });
+  else if (sort === "creados") q = q.order("created_at", { ascending: false });
+  else if (sort === "vencimiento" && !viewMissing) q = q.order("next_days", { ascending: true, nullsFirst: false });
+  else q = q.order("last_message_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+  if (segment && !viewMissing) q = q.eq("segment", segment);
   if (status) q = q.eq("status", status);
   if (source) q = q.eq("lead_source", source);
   if (advisor === "__none") q = q.is("advisor", null);
   else if (advisor) q = q.eq("advisor", advisor);
   const term = search.trim().replace(/[%,()]/g, "");
-  if (term) q = q.or(`name.ilike.%${term}%,wa_name.ilike.%${term}%,phone.ilike.%${term.replace(/\D/g, "") || term}%,doc_number.ilike.%${term}%`);
-  return check(await q) ?? [];
+  if (term) {
+    const plate = term.toUpperCase().replace(/[^0-9A-Z]/g, "");
+    q = q.or(
+      `name.ilike.%${term}%,wa_name.ilike.%${term}%,phone.ilike.%${term.replace(/\D/g, "") || term}%,doc_number.ilike.%${term}%` +
+        (viewMissing ? "" : `,soat_plates.ilike.%${plate || term}%`)
+    );
+  }
+  const { data, error, count } = await q;
+  if (error && !viewMissing && /crm_contacts_view|soat_plates|segment|next_days/.test(error.message || "")) {
+    viewMissing = true;
+    return listContacts({ search, status, source, advisor, segment, sort });
+  }
+  if (error) throw error;
+  const rows = data ?? [];
+  rows.total = count ?? rows.length;
+  return rows;
+}
+
+// Cuántos contactos hay en cada segmento (para las pestañas)
+export async function segmentCounts() {
+  if (viewMissing) return null;
+  const out = {};
+  await Promise.all(
+    Object.keys(SEGMENTS).map(async (k) => {
+      let q = need().from("crm_contacts_view").select("id", { count: "exact", head: true });
+      if (k) q = q.eq("segment", k);
+      const { count, error } = await q;
+      out[k] = error ? null : count;
+    })
+  );
+  return out;
 }
 
 // Crea (mode "manual") o importa en bloque (mode "import") clientes. Ver crm_contacts_import.sql.

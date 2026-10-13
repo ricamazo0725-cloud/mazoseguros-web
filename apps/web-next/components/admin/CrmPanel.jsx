@@ -11,6 +11,9 @@ import {
   getLeads,
   TOPICS,
   listContacts,
+  segmentCounts,
+  SEGMENTS,
+  SORTS,
   listAdvisorNames,
   updateContact,
   deleteContact,
@@ -37,6 +40,12 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const [source, setSource] = useState("");
   const [advisor, setAdvisor] = useState("");
   const [advisorNames, setAdvisorNames] = useState([]);
+  const [segment, setSegment] = useState("");
+  const [sort, setSort] = useState("recientes");
+  const [counts, setCounts] = useState(null);
+  const [total, setTotal] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const activeFilters = [status, source, advisor].filter(Boolean).length + (sort !== "recientes" ? 1 : 0);
   useEffect(() => {
     listAdvisorNames().then(setAdvisorNames).catch(() => {});
   }, []);
@@ -45,13 +54,15 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const [mode, setMode] = useState(null); // null | "new" | "import"
 
   const refresh = useCallback(() => {
-    listContacts({ search, status, source, advisor })
+    listContacts({ search, status, source, advisor, segment, sort })
       .then((rows) => {
         setContacts(rows);
+        setTotal(rows.total ?? rows.length);
         setError("");
       })
       .catch((e) => setError(e.message));
-  }, [search, status, source, advisor]);
+    segmentCounts().then(setCounts).catch(() => {});
+  }, [search, status, source, advisor, segment, sort]);
 
   useEffect(() => {
     const t = setTimeout(refresh, 250); // espera a que termine de escribir
@@ -84,7 +95,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const showRight = selectedId || mode;
 
   return (
-    <div className="grid gap-6 md:grid-cols-[320px_1fr]">
+    <div className="grid gap-6 md:grid-cols-[360px_1fr]">
       <aside className={`space-y-3 ${showRight ? "hidden md:block" : ""}`}>
         <div className="flex gap-2">
           <button
@@ -100,84 +111,117 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
             📂 Importar
           </button>
         </div>
-        <input
-          className={input}
-          placeholder="Buscar por nombre, teléfono o documento"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select className={input} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Todos los estados</option>
-          {Object.entries(CONTACT_STATUS).map(([k, v]) => (
-            <option key={k} value={k}>
+        {/* Segmentos */}
+        <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-surface-2 border border-border">
+          {Object.entries(SEGMENTS).map(([k, v]) => (
+            <button
+              key={k || "all"}
+              onClick={() => setSegment(k)}
+              className={`rounded-md px-1 py-1.5 text-[11px] font-mono leading-tight transition ${
+                segment === k ? "bg-background shadow-sm text-accent font-semibold" : "text-muted hover:text-foreground"
+              }`}
+            >
               {v}
-            </option>
+              {counts?.[k] != null && <span className="block text-[10px] opacity-70">{counts[k]}</span>}
+            </button>
           ))}
-        </select>
-        <select className={input} value={source} onChange={(e) => setSource(e.target.value)}>
-          <option value="">Todos los orígenes</option>
-          {Object.entries(LEAD_SOURCE)
-            .filter(([k]) => k !== "import" && k !== "manual")
-            .map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-        </select>
-        <select className={input} value={advisor} onChange={(e) => setAdvisor(e.target.value)}>
-          <option value="">Todos los asesores</option>
-          <option value="__none">Sin asesor asignado</option>
-          {advisorNames.map((n) => (
-            <option key={n} value={n}>
-              👤 {n}
-            </option>
-          ))}
-        </select>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className={input}
+            placeholder="Buscar nombre, celular, cédula o placa"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`shrink-0 text-xs font-mono px-3 rounded border ${showFilters || activeFilters ? "border-accent text-accent" : "border-border text-muted"}`}
+            title="Filtros y orden"
+          >
+            ⚙︎{activeFilters ? ` ${activeFilters}` : ""}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="space-y-2 doc-card p-3">
+            <select className={input} value={sort} onChange={(e) => setSort(e.target.value)}>
+              {Object.entries(SORTS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  Orden: {v}
+                </option>
+              ))}
+            </select>
+            <select className={input} value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">Todos los estados</option>
+              {Object.entries(CONTACT_STATUS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <select className={input} value={source} onChange={(e) => setSource(e.target.value)}>
+              <option value="">Todos los orígenes</option>
+              {Object.entries(LEAD_SOURCE).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <select className={input} value={advisor} onChange={(e) => setAdvisor(e.target.value)}>
+              <option value="">Todos los asesores</option>
+              <option value="__none">Sin asesor asignado</option>
+              {advisorNames.map((n) => (
+                <option key={n} value={n}>
+                  👤 {n}
+                </option>
+              ))}
+            </select>
+            {activeFilters > 0 && (
+              <button
+                onClick={() => {
+                  setStatus("");
+                  setSource("");
+                  setAdvisor("");
+                  setSort("recientes");
+                }}
+                className="text-xs font-mono text-muted hover:text-accent"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+        )}
         <datalist id="crm-advisor-names">
           {advisorNames.map((n) => (
             <option key={n} value={n} />
           ))}
         </datalist>
+
+        <div className="flex items-center justify-between text-[11px] font-mono text-muted px-1">
+          <span>
+            {total} {total === 1 ? "contacto" : "contactos"}
+            {segment ? ` · ${SEGMENTS[segment]}` : ""}
+          </span>
+          {total > contacts.length && <span>mostrando {contacts.length}</span>}
+        </div>
         {error && <p className="text-xs text-danger font-mono">{error}</p>}
-        <ul className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+        <ul className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
           {contacts.length === 0 && !error && (
-            <li className="text-sm text-muted font-mono">Sin contactos todavía.</li>
+            <li className="text-sm text-muted font-mono p-4 text-center">
+              {search || activeFilters || segment ? "Nada coincide con la búsqueda." : "Sin contactos todavía."}
+            </li>
           )}
           {contacts.map((c) => (
             <li key={c.id}>
-              <button
+              <ContactRow
+                c={c}
+                active={c.id === selectedId}
                 onClick={() => {
                   setMode(null);
                   setSelectedId(c.id);
                 }}
-                className={`w-full text-left doc-card p-3 focus-ring ${
-                  c.id === selectedId ? "border-accent" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-display font-semibold truncate">{c.name || c.wa_name || c.phone}</span>
-                  {c.unread_count > 0 && (
-                    <span className="text-[10px] font-mono bg-accent text-accent-foreground rounded-full px-2 py-0.5">
-                      {c.unread_count}
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs font-mono text-muted flex justify-between gap-2">
-                  <span>{c.phone ? `+${c.phone}` : c.doc_number || "sin teléfono"}</span>
-                  <span>
-                    {birthdayInfo(c.birth_date)?.days === 0 && "🎂 "}
-                    {c.bot_state === "asesor" && "🙋 "}
-                    {CONTACT_STATUS[c.status] || c.status}
-                  </span>
-                </div>
-                <div className="text-[11px] text-muted mt-1 flex justify-between gap-2">
-                  <span>
-                    {LEAD_SOURCE[c.lead_source] || ""}
-                    {c.advisor && <> · 👤 {c.advisor}</>}
-                  </span>
-                  {c.last_message_at && <span>{fmtDateTime(c.last_message_at)}</span>}
-                </div>
-              </button>
+              />
             </li>
           ))}
         </ul>
@@ -218,6 +262,81 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
         )}
       </section>
     </div>
+  );
+}
+
+const SEGMENT_CHIP = {
+  cliente: { label: "Cliente", cls: "bg-accent/10 text-accent border-accent/30" },
+  solo_soat: { label: "Solo SOAT", cls: "bg-primary/10 text-primary border-primary/30" },
+  prospecto: { label: "Prospecto", cls: "bg-surface-2 text-muted border-border" },
+};
+const KIND = { soat: "SOAT", rtm: "RTM", poliza: "Póliza" };
+
+function initials(n) {
+  const w = String(n || "?").replace(/[^\p{L}\s]/gu, "").trim().split(/\s+/);
+  return ((w[0]?.[0] || "?") + (w[1]?.[0] || "")).toUpperCase();
+}
+
+function dueChip(c) {
+  if (c.next_date == null || c.next_days == null) return null;
+  const d = c.next_days;
+  const when = d < 0 ? `venció hace ${-d} d` : d === 0 ? "vence hoy" : `vence en ${d} d`;
+  const cls = d < 0 ? "text-danger border-danger/40" : d <= 30 ? "text-accent border-accent/40" : "text-muted border-border";
+  return <span className={`text-[10px] font-mono border rounded px-1.5 py-0.5 ${cls}`}>{KIND[c.next_kind] || ""} {when}</span>;
+}
+
+function ContactRow({ c, active, onClick }) {
+  const name = c.name || c.wa_name || (c.phone ? `+${c.phone}` : "Sin nombre");
+  const seg = SEGMENT_CHIP[c.segment];
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left doc-card p-3 focus-ring flex gap-3 items-start transition ${active ? "border-accent ring-1 ring-accent/40" : "hover:border-accent/50"}`}
+    >
+      <span
+        className={`shrink-0 w-9 h-9 rounded-full grid place-items-center text-xs font-semibold ${
+          c.segment === "solo_soat" ? "bg-primary/15 text-primary" : c.segment === "cliente" ? "bg-accent/15 text-accent" : "bg-surface-2 text-muted"
+        }`}
+      >
+        {initials(name)}
+      </span>
+      <span className="min-w-0 flex-1 space-y-1">
+        <span className="flex items-center justify-between gap-2">
+          <span className="font-display font-semibold truncate">{name}</span>
+          <span className="flex items-center gap-1 shrink-0">
+            {birthdayInfo(c.birth_date)?.days === 0 && <span title="Cumple hoy">🎂</span>}
+            {c.bot_state === "asesor" && <span title="Atendido por asesor">🙋</span>}
+            {c.unread_count > 0 && (
+              <span className="text-[10px] font-mono bg-accent text-accent-foreground rounded-full px-2 py-0.5">{c.unread_count}</span>
+            )}
+          </span>
+        </span>
+        <span className="block text-xs font-mono text-muted truncate">
+          {c.phone ? `+${c.phone}` : c.doc_number || "sin teléfono"}
+          {c.advisor && <> · 👤 {c.advisor}</>}
+        </span>
+        <span className="flex flex-wrap items-center gap-1">
+          {seg && <span className={`text-[10px] font-mono border rounded px-1.5 py-0.5 ${seg.cls}`}>{seg.label}</span>}
+          {c.segment === "solo_soat" && c.soat_plates && (
+            <span className="text-[10px] font-mono border border-border rounded px-1.5 py-0.5 tracking-wider">🚗 {c.soat_plates}</span>
+          )}
+          {c.policies_count > 0 && (
+            <span className="text-[10px] font-mono border border-border rounded px-1.5 py-0.5">
+              {c.policies_count} {c.policies_count === 1 ? "póliza" : "pólizas"}
+              {c.soat_count > 0 ? ` · ${c.soat_count} SOAT` : ""}
+            </span>
+          )}
+          {dueChip(c)}
+          {!seg && <span className="text-[10px] font-mono text-muted">{CONTACT_STATUS[c.status] || c.status}</span>}
+        </span>
+        {c.last_message_at && (
+          <span className="block text-[10px] text-muted">
+            💬 {fmtDateTime(c.last_message_at)}
+            {LEAD_SOURCE[c.lead_source] ? ` · ${LEAD_SOURCE[c.lead_source]}` : ""}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
 
