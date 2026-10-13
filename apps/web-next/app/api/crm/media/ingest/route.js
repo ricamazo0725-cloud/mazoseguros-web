@@ -1,4 +1,5 @@
 import { supabaseAdmin, json } from "@/lib/serverAuth";
+import { processSoat } from "@/lib/soatReader";
 
 // Descarga el audio/imagen/documento de un mensaje entrante de WhatsApp y lo guarda
 // en el bucket privado "crm-media" (los enlaces de WhatsApp vencen).
@@ -71,7 +72,21 @@ export async function POST(request) {
     .from("crm_messages")
     .update({ media_path: path, media_mime: mime, media_error: null, body: msg.body ?? media.caption ?? null })
     .eq("id", msg.id);
-  return json({ ok: true, path, mime, bytes: buf.length });
+
+  // Modo asesor: una foto o PDF que manda un asesor es un SOAT → leerlo y guardarlo.
+  // Se procesa en segundo plano para responderle rápido a Supabase (pg_net espera máx. 20 s).
+  let soat = false;
+  if (mime.startsWith("image/") || mime === "application/pdf") {
+    const { data: contact } = await sb.from("crm_contacts").select("phone").eq("id", msg.contact_id).single();
+    const { data: isAdvisor } = contact?.phone ? await sb.rpc("crm_is_advisor", { p_phone: contact.phone }) : { data: false };
+    if (isAdvisor) {
+      soat = true;
+      processSoat(sb, { buf, mime, path, messageId: msg.id, advisorPhone: contact.phone }).catch((e) =>
+        console.error("SOAT:", e.message)
+      );
+    }
+  }
+  return json({ ok: true, path, mime, bytes: buf.length, soat });
 }
 
 // Tipo real del archivo según sus primeros bytes

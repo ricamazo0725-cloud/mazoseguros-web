@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactPolicies } from "@/components/admin/PoliciesPanel";
+import { ContactSoat } from "@/components/admin/SoatPanel";
 import { MessageMedia, VoiceRecorder, isMediaMessage } from "@/components/admin/ChatMedia";
 import { NewContactForm, ContactImport } from "@/components/admin/ContactCreate";
 import {
@@ -337,6 +338,7 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
       </div>
 
       <ContactPolicies contactId={contact.id} />
+      <ContactSoat contactId={contact.id} />
 
       <div className="doc-card p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">

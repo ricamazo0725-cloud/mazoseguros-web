@@ -265,6 +265,18 @@ begin
   v_state := ct.bot_state;
   v_data := coalesce(ct.bot_data, '{}'::jsonb);
 
+  -- Asesores (crm_advisors, ver crm_soat.sql): BotMazo los atiende en "modo asesor"
+  -- salvo que hayan pedido "modo cliente" (2 h) para probar el bot.
+  if to_regclass('public.crm_advisors') is not null then
+    if v_in = 'modo asesor' then
+      update crm_advisors set client_mode_until = null where phone = v_phone;
+    end if;
+    if exists (select 1 from crm_advisors a where a.phone = v_phone and a.active
+               and (a.client_mode_until is null or a.client_mode_until < now())) then
+      return crm_advisor_step(v_phone, p_text, p_reply_id);
+    end if;
+  end if;
+
   -- Una conversación a medias se olvida tras 2 horas sin respuesta
   if v_state is not null and v_state <> 'asesor' and ct.bot_updated_at < now() - interval '2 hours' then
     v_state := null; v_data := '{}'::jsonb;

@@ -63,6 +63,10 @@ begin
   if v_prev is not null and v_prev > now() - interval '30 days' then return new; end if;
 
   select * into c from crm_contacts where id = new.contact_id;
+  -- Los asesores que le escriben al bot no son leads
+  if to_regclass('public.crm_advisors') is not null then
+    if crm_is_advisor(c.phone) then return new; end if;
+  end if;
   v_msg := new.raw -> 'entry' -> 0 -> 'changes' -> 0 -> 'value' -> 'messages' -> 0;
   v_ref := v_msg -> 'referral';
 

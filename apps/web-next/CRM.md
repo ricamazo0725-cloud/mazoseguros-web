@@ -41,3 +41,14 @@ Desde la conversación puedes responder por WhatsApp. Al enviar, BotMazo se paus
 3. En el celular, abre `https://mazoseguros.com/admin`:
    - **Android (Chrome):** menú ⋮ → "Instalar app", y después toca "🔕 Activar avisos".
    - **iPhone (Safari, iOS 16.4 o superior):** Compartir → "Agregar a inicio", abre la app desde el ícono y toca "🔕 Activar avisos".
+
+## SOAT y modo asesor de BotMazo
+
+1. En Supabase activa la extensión **pg_cron** (Database → Extensions) y ejecuta en este orden: `crm_soat.sql`, `crm_bot.sql`, `crm_leads.sql`.
+2. En Hostinger agrega `GEMINI_API_KEY` (y si quieres `GUPSHUP_TPL_SOAT_ID`) y haz redeploy.
+3. Los números de `crm_advisors` (se administran en la pestaña **SOAT**) que le escriben a la línea del bot entran al modo asesor:
+   - foto o PDF de un SOAT → se lee con IA, se guarda en `crm_soat`, se vincula al cliente (por documento o celular; si no existe se crea) y el bot responde con los datos;
+   - `ABC123` (placa), una cédula, `vencen`, `vencen 60`, `vencidos`, `fecha ABC123 31/12/2026`, `tel ABC123 3001234567`, `ayuda`;
+   - `modo cliente` prueba el bot como cliente por 2 h; `modo asesor` vuelve.
+4. Todos los días a las 8 a. m. (Colombia) `crm_soat_daily()` avisa los SOAT que vencen en 30, 15, 5, 1 y 0 días: aviso push al admin y WhatsApp a los asesores (texto libre si escribieron en las últimas 24 h; si no, con la plantilla).
+5. El SOAT se guarda aparte de `crm_policies`: un cliente de autos puede tener su póliza de autos y además su SOAT.

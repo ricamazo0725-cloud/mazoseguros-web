@@ -11,9 +11,10 @@ import CrmPanel from "@/components/admin/CrmPanel";
 import AgendaPanel from "@/components/admin/AgendaPanel";
 import PushToggle from "@/components/admin/PushToggle";
 import PoliciesPanel from "@/components/admin/PoliciesPanel";
+import SoatPanel from "@/components/admin/SoatPanel";
 import { registerAdminSW } from "@/lib/push";
 
-const TABS = ["CRM", "Pólizas", "Agenda", "Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
+const TABS = ["CRM", "Pólizas", "SOAT", "Agenda", "Contenido", "Imágenes", "Seguros", "Blog", "Cotizaciones"];
 const CATEGORY_IDS = ["auto", "propiedades", "salud", "obras-civiles"];
 const CATEGORY_LABEL = { auto: "Autos", propiedades: "Propiedades", salud: "Salud", "obras-civiles": "Obras civiles" };
 
@@ -103,6 +104,14 @@ function Dashboard() {
         )}
         {tab === "Pólizas" && (
           <PoliciesPanel
+            onOpenContact={(id) => {
+              setOpenContactId(id);
+              setTab("CRM");
+            }}
+          />
+        )}
+        {tab === "SOAT" && (
+          <SoatPanel
             onOpenContact={(id) => {
               setOpenContactId(id);
               setTab("CRM");
