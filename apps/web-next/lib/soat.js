@@ -116,3 +116,65 @@ export async function saveAdvisor(phone, name) {
 export async function setAdvisorActive(phone, active) {
   check(await sb().from("crm_advisors").update({ active }).eq("phone", phone));
 }
+
+// ───────────── Tecnomecánica (crm_rtm, ver crm_vehicle_reminders.sql) ─────────────
+export async function listRtm({ search = "", filter = "por_vencer" } = {}) {
+  let q = sb().from("crm_rtm_view").select("*").limit(500);
+  if (filter === "por_vencer") q = q.eq("computed_status", "por_vencer").order("expiry_date", { ascending: true });
+  else if (filter === "vencido") q = q.eq("computed_status", "vencido").order("expiry_date", { ascending: false });
+  else if (filter === "vigente") q = q.in("computed_status", ["vigente", "por_vencer"]).order("expiry_date", { ascending: true });
+  else q = q.order("created_at", { ascending: false });
+  const term = search.trim().replace(/[%,()]/g, "");
+  if (term) {
+    const plate = term.toUpperCase().replace(/[^0-9A-Z]/g, "");
+    q = q.or(`plate.ilike.%${plate || term}%,contact_name.ilike.%${term}%,certificate_number.ilike.%${term}%,center_name.ilike.%${term}%`);
+  }
+  return check(await q) ?? [];
+}
+
+export async function rtmForContact(contactId) {
+  return check(await sb().from("crm_rtm_view").select("*").eq("contact_id", contactId).order("expiry_date", { ascending: false })) ?? [];
+}
+
+export async function saveRtm(r) {
+  const data = {
+    plate: String(r.plate || "").toUpperCase().replace(/[^0-9A-Z]/g, "") || null,
+    certificate_number: r.certificate_number?.trim() || null,
+    center_name: r.center_name?.trim() || null,
+    issue_date: r.issue_date || null,
+    expiry_date: r.expiry_date || null,
+    notes: r.notes?.trim() || null,
+  };
+  if (!data.plate) throw new Error("Escribe la placa.");
+  if (!data.expiry_date) throw new Error("Escribe la fecha de vencimiento.");
+  const q = r.id
+    ? sb().from("crm_rtm").update(data).eq("id", r.id)
+    : sb().from("crm_rtm").insert({ ...data, contact_id: r.contact_id || null, created_by: "admin" });
+  const { data: row, error } = await q.select().single();
+  if (error?.code === "23505") throw new Error("Ya hay una tecnomecánica de esa placa con ese vencimiento.");
+  if (error) throw error;
+  return row;
+}
+
+export async function deleteRtm(id) {
+  check(await sb().from("crm_rtm").delete().eq("id", id));
+}
+
+// ───────────── Recordatorios al cliente ─────────────
+export async function sendReminderNow(kind, id) {
+  const { data } = await sb().auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
+  const res = await fetch("/api/crm/vehicles/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ kind, id }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
+  return body.results?.[0];
+}
+
+export async function listNotifications(limit = 50) {
+  return check(await sb().from("crm_notifications").select("*").order("created_at", { ascending: false }).limit(limit)) ?? [];
+}

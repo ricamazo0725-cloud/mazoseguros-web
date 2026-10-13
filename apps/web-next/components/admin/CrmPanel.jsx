@@ -208,6 +208,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
     doc_number: contact.doc_number || "",
     city: contact.city || "",
     birth_date: contact.birth_date || "",
+    notify_opt_out: !!contact.notify_opt_out,
     phone: contact.phone || "",
     onedrive_folder: contact.onedrive_folder || "",
   });
@@ -253,6 +254,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
         doc_number: form.doc_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() || null,
         city: form.city || null,
         birth_date: form.birth_date || null,
+        ...(contact.notify_opt_out !== undefined ? { notify_opt_out: form.notify_opt_out } : {}),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -415,6 +417,16 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
         </div>
+        {contact.notify_opt_out !== undefined && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!form.notify_opt_out}
+              onChange={(e) => setForm({ ...form, notify_opt_out: !e.target.checked })}
+            />
+            Enviarle recordatorios automáticos de vencimiento (SOAT y tecnomecánica) por WhatsApp y correo
+          </label>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={save} disabled={busy} className="btn-cta text-xs py-2 px-4">
             {busy ? "Guardando…" : "Guardar cambios"}

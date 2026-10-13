@@ -11,9 +11,15 @@ import {
   listAdvisors,
   saveAdvisor,
   setAdvisorActive,
+  listRtm,
+  rtmForContact,
+  saveRtm,
+  deleteRtm,
+  sendReminderNow,
+  listNotifications,
 } from "@/lib/soat";
 import { fmtDate, fmtMoney, daysLabel } from "@/lib/policies";
-import { mediaUrl } from "@/lib/crm";
+import { mediaUrl, fmtDateTime } from "@/lib/crm";
 
 const input = "w-full bg-background border border-border rounded px-3 py-2 text-sm focus-ring";
 const label = "text-xs font-mono uppercase tracking-wider text-muted";
@@ -54,6 +60,33 @@ function ImageLink({ path }) {
   );
 }
 
+// Envía ya el recordatorio de vencimiento al cliente (WhatsApp + correo)
+function SendNow({ kind, id }) {
+  const [state, setState] = useState(null);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        disabled={state === "sending"}
+        className="text-xs font-mono text-muted hover:text-accent"
+        onClick={async () => {
+          if (!confirm("¿Enviar ya el recordatorio de vencimiento al cliente por WhatsApp y correo?")) return;
+          setState("sending");
+          try {
+            const r = await sendReminderNow(kind, id);
+            setState(r?.log?.map((l) => `${l.channel === "email" ? "✉️" : "💬"} ${l.status}${l.detail ? ` (${l.detail})` : ""}`).join(" · ") || "listo");
+          } catch (e) {
+            setState("⚠️ " + e.message);
+          }
+        }}
+      >
+        {state === "sending" ? "Enviando…" : "📨 Enviar recordatorio"}
+      </button>
+      {state && state !== "sending" && <span className="text-[11px] font-mono text-muted">{state}</span>}
+    </span>
+  );
+}
+
 function SoatCard({ s, onEdit, onDelete, onOpenContact, showClient = true }) {
   return (
     <div className="doc-card p-4 space-y-1">
@@ -86,6 +119,7 @@ function SoatCard({ s, onEdit, onDelete, onOpenContact, showClient = true }) {
       )}
       <div className="flex flex-wrap gap-3 pt-1">
         <ImageLink path={s.image_path} />
+        <SendNow kind="soat" id={s.id} />
         {onEdit && <button onClick={() => onEdit(s)} className="text-xs font-mono text-muted hover:text-accent">Editar</button>}
         {onDelete && (
           <button
@@ -218,6 +252,126 @@ function SoatForm({ initial, onSaved, onCancel }) {
   );
 }
 
+// ───────────── Tecnomecánica ─────────────
+function RtmCard({ r, onEdit, onDelete, onOpenContact, showClient = true }) {
+  return (
+    <div className="doc-card p-4 space-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-bold text-lg tracking-wider">{r.plate}</span>
+          <span className="text-[10px] font-mono text-muted">🔧 RTM</span>
+          <Badge status={r.computed_status} />
+        </div>
+        <span className={`text-xs font-mono ${r.days_left !== null && r.days_left <= 30 ? "text-accent" : "text-muted"}`}>
+          {fmtDate(r.expiry_date)} · {daysLabel(r.days_left)}
+        </span>
+      </div>
+      <div className="text-sm text-muted">
+        {r.center_name || "CDA —"}
+        {r.certificate_number && <> · Cert. {r.certificate_number}</>}
+      </div>
+      {showClient && (
+        <div className="text-sm">
+          👤 {r.contact_name || "sin cliente"}
+          {r.contact_phone && <span className="font-mono text-xs text-muted"> · +{r.contact_phone}</span>}
+          {r.contact_id && onOpenContact && (
+            <button onClick={() => onOpenContact(r.contact_id)} className="ml-2 text-xs font-mono text-accent hover:underline">
+              ver cliente →
+            </button>
+          )}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3 pt-1">
+        <SendNow kind="rtm" id={r.id} />
+        {onEdit && <button onClick={() => onEdit(r)} className="text-xs font-mono text-muted hover:text-accent">Editar</button>}
+        {onDelete && (
+          <button
+            onClick={() => confirm(`¿Borrar la tecnomecánica de ${r.plate}?`) && onDelete(r)}
+            className="text-xs font-mono text-muted hover:text-danger"
+          >
+            Borrar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RtmForm({ initial, onSaved, onCancel }) {
+  const [f, setF] = useState({
+    id: initial?.id,
+    contact_id: initial?.contact_id,
+    plate: initial?.plate || "",
+    expiry_date: initial?.expiry_date || "",
+    issue_date: initial?.issue_date || "",
+    certificate_number: initial?.certificate_number || "",
+    center_name: initial?.center_name || "",
+    notes: initial?.notes || "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  return (
+    <form
+      className="doc-card p-5 space-y-4"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setErr("");
+        try {
+          await saveRtm(f);
+          onSaved?.();
+        } catch (e2) {
+          setErr(e2.message);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <h3 className="font-display font-semibold">{f.id ? `Editar tecnomecánica ${initial.plate}` : "Nueva tecnomecánica"}</h3>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="space-y-1"><label className={label}>Placa *</label><input className={input} value={f.plate} onChange={set("plate")} placeholder="ABC123" /></div>
+        <div className="space-y-1"><label className={label}>Vence *</label><input type="date" className={input} value={f.expiry_date} onChange={set("expiry_date")} /></div>
+        <div className="space-y-1"><label className={label}>Expedición</label><input type="date" className={input} value={f.issue_date} onChange={set("issue_date")} /></div>
+        <div className="space-y-1"><label className={label}>Certificado</label><input className={input} value={f.certificate_number} onChange={set("certificate_number")} /></div>
+        <div className="space-y-1 sm:col-span-2"><label className={label}>CDA</label><input className={input} value={f.center_name} onChange={set("center_name")} /></div>
+      </div>
+      <div className="space-y-1"><label className={label}>Notas</label><textarea className={input} rows={2} value={f.notes} onChange={set("notes")} /></div>
+      <p className="text-xs text-muted">El cliente se toma del SOAT de la misma placa si no viene de su ficha.</p>
+      {err && <p className="text-xs text-danger font-mono">{err}</p>}
+      <div className="flex gap-3">
+        <button className="btn-cta text-sm py-2 px-5" disabled={busy}>{busy ? "Guardando…" : "Guardar"}</button>
+        <button type="button" onClick={onCancel} className="text-sm font-mono text-muted hover:text-accent">Cancelar</button>
+      </div>
+    </form>
+  );
+}
+
+// Registro de recordatorios enviados a clientes
+function NotificationsLog() {
+  const [rows, setRows] = useState(null);
+  return (
+    <details className="doc-card p-4" onToggle={(e) => e.currentTarget.open && !rows && listNotifications().then(setRows).catch(() => setRows([]))}>
+      <summary className="cursor-pointer font-display font-semibold">📨 Recordatorios enviados a clientes</summary>
+      <p className="text-xs text-muted mt-2">
+        Cada día a las 9 a. m. se avisa al cliente 30, 15 y 3 días antes del vencimiento del SOAT y de la tecnomecánica,
+        por WhatsApp y correo.
+      </p>
+      <ul className="mt-3 space-y-1 text-xs font-mono max-h-72 overflow-y-auto">
+        {rows === null && <li className="text-muted">Cargando…</li>}
+        {rows?.length === 0 && <li className="text-muted">Todavía no se ha enviado ninguno.</li>}
+        {rows?.map((n) => (
+          <li key={n.id} className={n.status === "error" ? "text-danger" : n.status === "omitido" ? "text-muted" : ""}>
+            {fmtDateTime(n.created_at)} · {n.plate} {n.kind === "soat" ? "SOAT" : "RTM"} · {n.channel === "email" ? "✉️" : "💬"}{" "}
+            {n.destination || ""} · {n.status}
+            {n.detail ? ` (${n.detail})` : ""}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function Advisors() {
   const [rows, setRows] = useState([]);
   const [phone, setPhone] = useState("");
@@ -280,15 +434,16 @@ export default function SoatPanel({ onOpenContact }) {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState(null); // null | {} (nuevo) | soat
   const [error, setError] = useState("");
+  const [view, setView] = useState("soat"); // soat | rtm
 
   const refresh = useCallback(() => {
-    listSoat({ search, filter })
+    (view === "rtm" ? listRtm : listSoat)({ search, filter })
       .then((r) => {
         setRows(r);
         setError("");
       })
       .catch((e) => setError(e.message));
-  }, [search, filter]);
+  }, [search, filter, view]);
 
   useEffect(() => {
     const t = setTimeout(refresh, 250);
@@ -297,12 +452,43 @@ export default function SoatPanel({ onOpenContact }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start gap-3 justify-between">
-        <UploadSoat onSaved={refresh} />
-        <button onClick={() => setEditing({})} className={btn}>+ SOAT a mano</button>
+      <div className="flex gap-2">
+        {[
+          ["soat", "🚗 SOAT"],
+          ["rtm", "🔧 Tecnomecánica"],
+        ].map(([k, v]) => (
+          <button
+            key={k}
+            onClick={() => {
+              setView(k);
+              setEditing(null);
+              setRows([]);
+            }}
+            className={`text-sm font-mono px-4 py-2 rounded border ${view === k ? "border-accent text-accent" : "border-border text-muted"}`}
+          >
+            {v}
+          </button>
+        ))}
       </div>
 
-      {editing && (
+      <div className="flex flex-wrap items-start gap-3 justify-between">
+        {view === "soat" ? <UploadSoat onSaved={refresh} /> : <span />}
+        <button onClick={() => setEditing({})} className={btn}>{view === "soat" ? "+ SOAT a mano" : "+ Tecnomecánica"}</button>
+      </div>
+
+      {editing && view === "rtm" && (
+        <RtmForm
+          key={editing.id || "new-rtm"}
+          initial={editing.id ? editing : null}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            refresh();
+          }}
+        />
+      )}
+
+      {editing && view === "soat" && (
         <SoatForm
           key={editing.id || "new"}
           initial={editing.id ? editing : null}
@@ -339,8 +525,17 @@ export default function SoatPanel({ onOpenContact }) {
 
       {error && <p className="text-xs text-danger font-mono">{error}</p>}
       <div className="grid gap-3 md:grid-cols-2">
-        {rows.length === 0 && !error && <p className="text-sm text-muted font-mono">No hay SOAT en esta vista.</p>}
-        {rows.map((s) => (
+        {rows.length === 0 && !error && <p className="text-sm text-muted font-mono">No hay registros en esta vista.</p>}
+        {view === "rtm" && rows.map((r) => (
+          <RtmCard
+            key={r.id}
+            r={r}
+            onOpenContact={onOpenContact}
+            onEdit={(x) => setEditing(x)}
+            onDelete={(x) => deleteRtm(x.id).then(refresh).catch((e) => setError(e.message))}
+          />
+        ))}
+        {view === "soat" && rows.map((s) => (
           <SoatCard
             key={s.id}
             s={s}
@@ -351,6 +546,7 @@ export default function SoatPanel({ onOpenContact }) {
         ))}
       </div>
 
+      <NotificationsLog />
       <Advisors />
     </div>
   );
@@ -359,8 +555,13 @@ export default function SoatPanel({ onOpenContact }) {
 // SOAT en la ficha del cliente (CRM)
 export function ContactSoat({ contactId }) {
   const [rows, setRows] = useState([]);
+  const [rtm, setRtm] = useState([]);
   const [editing, setEditing] = useState(null);
-  const load = useCallback(() => soatForContact(contactId).then(setRows).catch(() => {}), [contactId]);
+  const [editingRtm, setEditingRtm] = useState(null);
+  const load = useCallback(() => {
+    soatForContact(contactId).then(setRows).catch(() => {});
+    rtmForContact(contactId).then(setRtm).catch(() => {});
+  }, [contactId]);
   useEffect(() => {
     load();
   }, [load]);
@@ -368,11 +569,26 @@ export function ContactSoat({ contactId }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-display font-semibold">🚗 SOAT</h3>
-        <button onClick={() => setEditing({ contact_id: contactId })} className="text-xs font-mono text-accent hover:underline">
-          + Agregar
-        </button>
+        <h3 className="font-display font-semibold">🚗 SOAT y tecnomecánica</h3>
+        <div className="flex gap-3">
+          <button onClick={() => setEditing({ contact_id: contactId })} className="text-xs font-mono text-accent hover:underline">
+            + SOAT
+          </button>
+          <button onClick={() => setEditingRtm({ contact_id: contactId })} className="text-xs font-mono text-accent hover:underline">
+            + Tecnomecánica
+          </button>
+        </div>
       </div>
+      {editingRtm && (
+        <RtmForm
+          initial={editingRtm.id ? editingRtm : { contact_id: contactId }}
+          onCancel={() => setEditingRtm(null)}
+          onSaved={() => {
+            setEditingRtm(null);
+            load();
+          }}
+        />
+      )}
       {editing && (
         <SoatForm
           initial={editing.id ? editing : { contact_id: contactId }}
@@ -383,7 +599,12 @@ export function ContactSoat({ contactId }) {
           }}
         />
       )}
-      {rows.length === 0 && !editing && <p className="text-xs text-muted font-mono">Sin SOAT registrados.</p>}
+      {rows.length === 0 && rtm.length === 0 && !editing && !editingRtm && (
+        <p className="text-xs text-muted font-mono">Sin SOAT ni tecnomecánica registrados.</p>
+      )}
+      {rtm.map((r) => (
+        <RtmCard key={r.id} r={r} showClient={false} onEdit={(x) => setEditingRtm(x)} onDelete={(x) => deleteRtm(x.id).then(load)} />
+      ))}
       {rows.map((s) => (
         <SoatCard key={s.id} s={s} showClient={false} onEdit={(x) => setEditing(x)} onDelete={(x) => deleteSoat(x.id).then(load)} />
       ))}

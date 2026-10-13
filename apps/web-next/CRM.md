@@ -56,3 +56,11 @@ Desde la conversación puedes responder por WhatsApp. Al enviar, BotMazo se paus
 ## Cumpleaños
 
 Ejecuta `crm_birthdays.sql` (y vuelve a correr `crm_contacts_import.sql` y `crm_soat.sql`). Agrega `crm_contacts.birth_date`, que se edita en la ficha del cliente, en "Nuevo cliente" o se importa con la columna `fecha_nacimiento`. Cada día a las 8 a. m. llega un aviso push con quienes cumplen años; en la lista del CRM aparece 🎂 y en el modo asesor del bot `cumpleaños` (o `cumpleaños 30`) lista los próximos.
+
+## Recordatorios al cliente: SOAT y tecnomecánica
+
+1. Ejecuta `crm_vehicle_reminders.sql` y luego vuelve a correr `crm_soat.sql`.
+2. En Hostinger agrega `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (correo) y `GUPSHUP_TPL_VENCIMIENTO_ID` (WhatsApp) y haz redeploy.
+3. La tecnomecánica se registra en la pestaña **SOAT → 🔧 Tecnomecánica**, en la ficha del cliente o por el bot con `rtm ABC123 01/04/2027`.
+4. Cada día a las 9 a. m. se avisa al cliente 30, 15 y 3 días antes del vencimiento por WhatsApp (plantilla; texto libre si escribió en las últimas 24 h) y por correo. Todo queda en `crm_notifications` (“📨 Recordatorios enviados” en la pestaña SOAT). Si no salió por ningún canal se reintenta al día siguiente.
+5. En la ficha del cliente se pueden desactivar sus recordatorios; en cada tarjeta hay **📨 Enviar recordatorio** para mandarlo ya.

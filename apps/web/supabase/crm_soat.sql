@@ -95,6 +95,7 @@ create or replace function crm_today() returns date language sql stable as $$
 $$;
 
 -- Estado calculado: renovado si hay un SOAT posterior de la misma placa
+drop view if exists crm_soat_view;  -- se recrea (s.* cambia si se agregan columnas)
 create or replace view crm_soat_view with (security_invoker = true) as
 select s.*,
   coalesce(nullif(c.name, ''), c.wa_name) as contact_name,
@@ -266,7 +267,7 @@ declare
   v_in text := crm_norm(coalesce(nullif(p_reply_id, ''), p_text));
   v_last_type text;
   v_out jsonb := '[]'::jsonb;
-  v_plate text; v_doc text; v_date date; v_days int; v_tel text;
+  v_plate text; v_doc text; v_date date; v_days int; v_tel text; v_rtm text;
   v_rows crm_soat[];
   s crm_soat;
   m text[];
@@ -289,6 +290,7 @@ begin
       E'⛔ *vencidos* — vencidos sin renovar.\n' ||
       E'✏️ *fecha ABC123 31/12/2026* — corregir vencimiento.\n' ||
       E'📱 *tel ABC123 3001234567* — celular del cliente.\n' ||
+      E'🔧 *rtm ABC123 01/04/2027* — vencimiento de la tecnomecánica.\n' ||
       E'🎂 *cumpleaños* — clientes que cumplen en los próximos 7 días.\n' ||
       E'🧪 *modo cliente* — probar el bot como cliente (2 h).',
       jsonb_build_array(
@@ -338,6 +340,21 @@ begin
         else E'✏️ Vencimiento actualizado\n\n' || crm_soat_text(s) end));
     end if;
 
+  elsif v_raw ~* '^(rtm|tecno|tecnomecanica|tecnomecánica)\s' then
+    m := regexp_match(v_raw, '^\S+\s+([A-Za-z0-9-]{5,7})\s+(\S+)$');
+    v_plate := crm_plate_norm(m[1]);
+    begin v_date := crm_parse_date(m[2]); exception when others then v_date := null; end;
+    if v_plate is null or v_date is null then
+      v_out := jsonb_build_array(crm_msg_text('Escríbelo así: *rtm ABC123 01/04/2027* (fecha de vencimiento de la tecnomecánica)'));
+    elsif to_regclass('public.crm_rtm') is null then
+      v_out := jsonb_build_array(crm_msg_text('Falta activar la tecnomecánica (crm_vehicle_reminders.sql).'));
+    else
+      insert into crm_rtm (plate, expiry_date, created_by) values (v_plate, v_date, v_phone)
+      on conflict (plate, expiry_date) do nothing;
+      v_out := jsonb_build_array(crm_msg_text('🔧 Tecnomecánica de *' || v_plate || '* guardada: vence ' || crm_fmt_date(v_date)
+        || ' (' || crm_soat_days_text(v_date) || '). Le aviso al cliente 30, 15 y 3 días antes.'));
+    end if;
+
   elsif v_raw ~* '^(tel|cel|celular|telefono|teléfono)\s' then
     m := regexp_match(v_raw, '^\S+\s+([A-Za-z0-9-]{5,7})\s+(.+)$');
     v_plate := crm_plate_norm(m[1]);
@@ -364,11 +381,20 @@ begin
     v_plate := crm_plate_norm(v_raw);
     select array_agg(x.s order by (x.s).end_date desc nulls last) into v_rows
     from (select s2 as s from crm_soat s2 where s2.plate = v_plate order by s2.end_date desc nulls last limit 3) x;
+    -- Tecnomecánica (crm_vehicle_reminders.sql)
+    if to_regclass('public.crm_rtm') is not null then
+      select '🔧 Tecnomecánica: ' || coalesce(crm_fmt_date(r.expiry_date), '?') || ' (' || crm_soat_days_text(r.expiry_date) || ')'
+             || coalesce(' · ' || r.center_name, '')
+        into v_rtm
+      from crm_rtm r where r.plate = v_plate order by r.expiry_date desc nulls last limit 1;
+    end if;
     if v_rows is null then
-      v_out := jsonb_build_array(crm_msg_text('No tengo SOAT de la placa *' || v_plate || '*. Mándame la foto y lo guardo 📷'));
+      v_out := jsonb_build_array(crm_msg_text('No tengo SOAT de la placa *' || v_plate || '*. Mándame la foto y lo guardo 📷'
+        || coalesce(E'\n\n' || v_rtm, '')));
     else
       v_out := jsonb_build_array(crm_msg_text(
-        (select string_agg(crm_soat_text(r), E'\n\n— anterior —\n' order by r.end_date desc nulls last) from unnest(v_rows) r)));
+        (select string_agg(crm_soat_text(r), E'\n\n— anterior —\n' order by r.end_date desc nulls last) from unnest(v_rows) r)
+        || coalesce(E'\n' || v_rtm, E'\n🔧 Tecnomecánica: sin registrar (*rtm ' || v_plate || ' DD/MM/AAAA*)')));
     end if;
 
   elsif v_raw ~ '^[0-9.\s]{5,15}$' then
