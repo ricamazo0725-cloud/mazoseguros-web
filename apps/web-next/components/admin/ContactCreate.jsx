@@ -15,10 +15,24 @@ const ALIASES = {
   telefono: ["telefono", "celular", "movil", "whatsapp", "phone", "tel", "numero celular"],
   email: ["email", "correo", "correo electronico", "e-mail", "mail"],
   ciudad: ["ciudad", "municipio", "city"],
-  interes: ["interes", "producto", "ramo", "seguro", "interest"],
-  estado: ["estado", "status", "etapa"],
+  interes: ["interes", "seguro", "interest"],
+  estado: ["estado", "status", "etapa", "estado poliza"],
+  estado_cliente: ["estado cliente", "estado del cliente"],
   notas: ["notas", "nota", "observaciones", "comentarios", "notes"],
+  notas_cliente: ["notas cliente", "notas del cliente"],
   carpeta_cliente: ["carpeta", "carpeta cliente", "carpeta_cliente", "onedrive", "ruta onedrive", "onedrive_folder"],
+  // Póliza (opcional): si la fila trae aseguradora, se crea/actualiza la póliza del cliente
+  aseguradora: ["aseguradora", "compania", "compania aseguradora", "insurer"],
+  numero_poliza: ["numero poliza", "numero de poliza", "no poliza", "poliza", "policy number"],
+  ramo: ["ramo", "linea", "tipo de poliza", "tipo poliza", "line"],
+  producto: ["producto", "plan", "product"],
+  bien_asegurado: ["bien asegurado", "vehiculo", "riesgo", "insured item"],
+  fecha_expedicion: ["fecha expedicion", "expedicion", "issue date"],
+  inicio_vigencia: ["inicio vigencia", "inicio de vigencia", "vigencia desde", "desde", "start date"],
+  fin_vigencia: ["fin vigencia", "fin de vigencia", "vencimiento", "vigencia hasta", "hasta", "end date"],
+  prima: ["prima", "valor prima", "premium"],
+  ruta_archivo: ["ruta archivo", "ruta", "file path"],
+  enlace_archivo: ["enlace archivo", "enlace", "link", "file url"],
 };
 
 const norm = (s) =>
@@ -293,8 +307,9 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
       <p className="text-sm text-muted">
         Sube un archivo <b>CSV</b> (de Excel: “Guardar como → CSV”) o pega abajo el contenido en CSV o JSON. La primera fila
         debe tener los encabezados. Columnas: <span className="font-mono text-xs">nombre, tipo_documento, documento, telefono,
-        email, ciudad, interes, estado, notas, carpeta_cliente</span>. Si el cliente ya existe (mismo documento o teléfono) solo
-        se completan los datos que le falten.
+        email, ciudad, interes, estado, notas, carpeta_cliente</span>. Si la fila trae <b>aseguradora</b> también se guarda la
+        póliza (numero_poliza, ramo, producto, bien_asegurado, inicio_vigencia, fin_vigencia, prima, estado de la póliza).
+        Si el cliente ya existe (mismo documento o teléfono) solo se completan los datos que le falten.
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -335,7 +350,7 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
                   <th className="p-2">Teléfono</th>
                   <th className="p-2">Correo</th>
                   <th className="p-2">Ciudad</th>
-                  <th className="p-2">Estado</th>
+                  <th className="p-2">Póliza</th>
                   <th className="p-2"></th>
                 </tr>
               </thead>
@@ -348,7 +363,9 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
                     <td className="p-2 font-mono">{r.telefono}</td>
                     <td className="p-2">{r.email}</td>
                     <td className="p-2">{r.ciudad}</td>
-                    <td className="p-2">{r.estado}</td>
+                    <td className="p-2">
+                      {r.aseguradora ? [r.aseguradora, r.numero_poliza, r.fin_vigencia && `vence ${r.fin_vigencia}`].filter(Boolean).join(" · ") : ""}
+                    </td>
                     <td className="p-2 text-danger">{checks[i]}</td>
                   </tr>
                 ))}
