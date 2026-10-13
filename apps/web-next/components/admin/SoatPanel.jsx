@@ -16,6 +16,8 @@ import {
   saveRtm,
   deleteRtm,
   sendReminderNow,
+  advisorWindows,
+  sendSoatToAdvisor,
   listNotifications,
   listVehicleDocs,
   bucketCounts,
@@ -91,6 +93,99 @@ function SendNow({ kind, id }) {
       </button>
       {state && state !== "sending" && <span className="text-[11px] font-mono text-muted">{state}</span>}
     </span>
+  );
+}
+
+// Manda el recordatorio de este SOAT al WhatsApp de un asesor (mensaje normal, sin plantilla)
+// para que él lo reenvíe al cliente desde su celular. Requiere la ventana de 24 h abierta.
+function SendToAdvisor({ s }) {
+  const [open, setOpen] = useState(false);
+  const [info, setInfo] = useState(null);
+  const [sel, setSel] = useState("");
+  const [state, setState] = useState("");
+  const load = () =>
+    advisorWindows()
+      .then((r) => {
+        setInfo(r);
+        const byName = r.advisors.find((a) => a.name && s.advisor && a.name.toLowerCase().includes(String(s.advisor).toLowerCase().split(" ")[0]));
+        setSel((cur) => cur || (byName || r.advisors.find((a) => a.open) || r.advisors[0])?.phone || "");
+      })
+      .catch((e) => setState("⚠️ " + e.message));
+  useEffect(() => {
+    if (open) load();
+  }, [open]);
+  const adv = info?.advisors.find((a) => a.phone === sel);
+  const openLink = info?.bot ? `https://wa.me/${info.bot}?text=${encodeURIComponent("hola")}` : "";
+  const invite = `Hola${adv?.name ? " " + adv.name.split(" ")[0] : ""}, escríbele "hola" al bot de Mazoseguros para mandarte los recordatorios de SOAT: ${openLink}`;
+  if (!open)
+    return (
+      <button type="button" className="text-xs font-mono text-muted hover:text-accent" onClick={() => setOpen(true)}>
+        🙋 Enviar al asesor
+      </button>
+    );
+  return (
+    <div className="basis-full rounded-xl border border-border bg-surface p-3 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-mono uppercase tracking-wider text-muted">Enviar a</span>
+        <select value={sel} onChange={(e) => { setSel(e.target.value); setState(""); }} className="text-xs font-mono rounded-full border border-border bg-background px-2 py-1">
+          {(info?.advisors || []).map((a) => (
+            <option key={a.phone} value={a.phone}>
+              {a.open ? "🟢" : "⚪"} {a.name || "+" + a.phone} {a.open ? `· abierta ${Math.floor(a.hoursLeft)} h` : "· sin conversación"}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={load} className="text-[11px] font-mono text-muted hover:text-accent">↻ revisar</button>
+        <button type="button" onClick={() => setOpen(false)} className="ml-auto text-[11px] font-mono text-muted hover:text-accent">✕</button>
+      </div>
+      {!info && !state && <p className="text-xs text-muted font-mono">Revisando conversaciones…</p>}
+      {adv && adv.open && (
+        <button
+          type="button"
+          disabled={state === "sending"}
+          className="btn-cta text-xs px-4 py-1.5"
+          onClick={async () => {
+            setState("sending");
+            try {
+              const r = await sendSoatToAdvisor(s.id, adv.phone);
+              setState(`✅ Enviado a ${adv.name || "+" + adv.phone} (${r.sent} mensajes). Él lo reenvía al cliente y responde "enviado ${s.plate}".`);
+            } catch (e) {
+              setState("⚠️ " + e.message);
+              load();
+            }
+          }}
+        >
+          {state === "sending" ? "Enviando…" : `📨 Enviar recordatorio de ${s.plate}`}
+        </button>
+      )}
+      {adv && !adv.open && (
+        <div className="text-xs space-y-2">
+          <p className="text-muted">
+            {adv.name || "El asesor"} no le ha escrito al bot en las últimas 24 h, y WhatsApp no deja mandarle mensajes sin plantilla. Pídele que
+            escriba <b>hola</b> al bot (puede tocar el enlace) y luego dale <b>↻ revisar</b>.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`https://wa.me/${adv.phone}?text=${encodeURIComponent(invite)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[11px] font-mono px-3 py-1 rounded-full border border-border hover:border-accent hover:text-accent"
+            >
+              💬 Pedírselo por WhatsApp
+            </a>
+            {openLink && (
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(openLink).then(() => setState("📋 Enlace copiado"))}
+                className="text-[11px] font-mono px-3 py-1 rounded-full border border-border hover:border-accent hover:text-accent"
+              >
+                📋 Copiar enlace al bot
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {state && state !== "sending" && <p className="text-[11px] font-mono text-muted">{state}</p>}
+    </div>
   );
 }
 
@@ -202,6 +297,7 @@ function SoatCard({ s, onEdit, onDelete, onOpenContact, showClient = true, onCha
       <div className="flex flex-wrap gap-3 pt-1">
         <ImageLink path={s.image_path} />
         <SendNow kind="soat" id={s.id} />
+        <SendToAdvisor s={s} />
         {onEdit && <button onClick={() => onEdit(s)} className="text-xs font-mono text-muted hover:text-accent">Editar</button>}
         {onDelete && (
           <button

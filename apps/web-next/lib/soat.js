@@ -258,6 +258,30 @@ export async function sendReminderNow(kind, id) {
   return body.results?.[0];
 }
 
+// ───────────── Envío manual al asesor (sin plantilla, dentro de la ventana de 24 h) ─────────────
+async function authFetch(url, opts = {}) {
+  const { data } = await sb().auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
+  const res = await fetch(url, {
+    ...opts,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(body.error || `Error ${res.status}`);
+    err.body = body;
+    throw err;
+  }
+  return body;
+}
+export function advisorWindows() {
+  return authFetch("/api/crm/soat/to-advisor");
+}
+export function sendSoatToAdvisor(soatId, advisor) {
+  return authFetch("/api/crm/soat/to-advisor", { method: "POST", body: JSON.stringify({ soat_id: soatId, advisor }) });
+}
+
 export async function listNotifications(limit = 50) {
   return check(await sb().from("crm_notifications").select("*").order("created_at", { ascending: false }).limit(limit)) ?? [];
 }

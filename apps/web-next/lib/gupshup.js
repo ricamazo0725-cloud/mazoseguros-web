@@ -79,6 +79,23 @@ export async function sendTemplate(sb, phone, templateId, params, logText, sentB
   return gs;
 }
 
+// Último mensaje entrante y horas que le quedan a la ventana de 24 h (0 = cerrada)
+export async function windowInfo(sb, phone) {
+  const { data: c } = await sb.from("crm_contacts").select("id").eq("phone", phone).maybeSingle();
+  if (!c) return { open: false, hoursLeft: 0, lastIn: null };
+  const { data: last } = await sb
+    .from("crm_messages")
+    .select("created_at")
+    .eq("contact_id", c.id)
+    .eq("direction", "in")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!last) return { open: false, hoursLeft: 0, lastIn: null };
+  const left = 23.5 - (Date.now() - new Date(last.created_at).getTime()) / 3600000;
+  return { open: left > 0, hoursLeft: Math.max(0, Math.floor(left * 10) / 10), lastIn: last.created_at };
+}
+
 // ¿Esta persona escribió en las últimas 24 h? (WhatsApp solo deja texto libre en esa ventana)
 export async function windowOpen(sb, phone) {
   const { data: c } = await sb.from("crm_contacts").select("id").eq("phone", phone).maybeSingle();

@@ -347,6 +347,18 @@ begin
            case when v_total > p_limit then ' (de ' || v_total || ' pendientes; escribe *recordar* otra vez cuando marques estos como *enviado*)' else '' end || ':'))
          || v_out;
 end $$;
+-- Envío manual desde el admin: recordatorio de un SOAT puntual para un asesor
+create or replace function crm_reminder_for_advisor_id(p_soat uuid, p_advisor text) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare s crm_soat;
+begin
+  select * into s from crm_soat where id = p_soat;
+  if not found then raise exception 'SOAT no encontrado'; end if;
+  return crm_reminder_for_advisor(s, p_advisor);
+end $$;
+revoke all on function crm_reminder_for_advisor_id(uuid, text) from public, anon, authenticated;
+grant execute on function crm_reminder_for_advisor_id(uuid, text) to service_role;
+
 revoke all on function crm_advisor_reminders(text, int) from public, anon, authenticated;
 revoke all on function crm_advisor_pending_count() from public, anon, authenticated;
 grant execute on function crm_advisor_reminders(text, int) to service_role;
