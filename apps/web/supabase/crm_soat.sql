@@ -317,6 +317,41 @@ begin
       E'\n\nCuando lo envíes escribe *enviado ' || s.plate || '* y lo marco como contactado.'));
 end $$;
 
+-- Recordatorios pendientes para un asesor: vencen en 0–7 días o vencieron en los últimos 30,
+-- sin gestión cerrada. Devuelve los mensajes (imagen + enlace) de hasta p_limit SOAT.
+create or replace function crm_advisor_pending_count() returns int
+language sql stable security definer set search_path = public as $$
+  select count(*)::int from crm_soat s2
+  where s2.end_date between crm_today() - 30 and crm_today() + 7
+    and coalesce(s2.follow_up, '') not in ('renovado', 'perdido', 'contactado')
+    and not exists (select 1 from crm_soat n where n.plate = s2.plate and n.end_date > s2.end_date)
+$$;
+
+create or replace function crm_advisor_reminders(p_advisor text, p_limit int default 5) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare s crm_soat; v_out jsonb := '[]'::jsonb; v_total int := crm_advisor_pending_count();
+begin
+  for s in
+    select s2.* from crm_soat s2
+    where s2.end_date between crm_today() - 30 and crm_today() + 7
+      and coalesce(s2.follow_up, '') not in ('renovado', 'perdido', 'contactado')
+      and not exists (select 1 from crm_soat n where n.plate = s2.plate and n.end_date > s2.end_date)
+    order by abs(s2.end_date - crm_today()) limit p_limit
+  loop
+    v_out := v_out || crm_reminder_for_advisor(s, p_advisor);
+  end loop;
+  if jsonb_array_length(v_out) = 0 then
+    return jsonb_build_array(crm_msg_text('✅ No hay SOAT pendientes por recordar (vencen en 7 días o vencidos en el último mes).'));
+  end if;
+  return jsonb_build_array(crm_msg_text('📨 Te mando ' || (jsonb_array_length(v_out) / 2) || ' recordatorio(s) para reenviar' ||
+           case when v_total > p_limit then ' (de ' || v_total || ' pendientes; escribe *recordar* otra vez cuando marques estos como *enviado*)' else '' end || ':'))
+         || v_out;
+end $$;
+revoke all on function crm_advisor_reminders(text, int) from public, anon, authenticated;
+revoke all on function crm_advisor_pending_count() from public, anon, authenticated;
+grant execute on function crm_advisor_reminders(text, int) to service_role;
+grant execute on function crm_advisor_pending_count() to service_role;
+
 -- ───────────── Modo asesor del bot ─────────────
 create or replace function crm_advisor_step(p_phone text, p_text text default null, p_reply_id text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -402,20 +437,8 @@ begin
         else E'✏️ Vencimiento actualizado\n\n' || crm_soat_text(s) end));
     end if;
 
-  elsif v_in ~ '^(recordar|recordatorio|recordatorios)$' then
-    -- Los más urgentes: vencen en 0–7 días o vencieron en los últimos 30, sin gestión cerrada
-    for s in
-      select s2.* from crm_soat s2
-      where s2.end_date between crm_today() - 30 and crm_today() + 7
-        and coalesce(s2.follow_up, '') not in ('renovado', 'perdido', 'contactado')
-        and not exists (select 1 from crm_soat n where n.plate = s2.plate and n.end_date > s2.end_date)
-      order by abs(s2.end_date - crm_today()) limit 5
-    loop
-      v_out := v_out || crm_reminder_for_advisor(s, v_phone);
-    end loop;
-    v_out := case when jsonb_array_length(v_out) = 0
-      then jsonb_build_array(crm_msg_text('✅ No hay SOAT pendientes por recordar (vencen en 7 días o vencidos en el último mes).'))
-      else jsonb_build_array(crm_msg_text('📨 Te mando ' || (jsonb_array_length(v_out) / 2) || ' recordatorio(s) para reenviar:')) || v_out end;
+  elsif v_in ~ '^(ver )?(recordar|recordatorio|recordatorios)$' then
+    v_out := crm_advisor_reminders(v_phone, 5);
 
   elsif v_raw ~* '^(recordar|recordatorio)\s' then
     v_plate := crm_plate_norm(regexp_replace(v_raw, '^\S+\s+', ''));
@@ -550,15 +573,13 @@ begin
   select array_agg(s order by s.end_date) into v_rows from crm_soat s where s.id in (select id from upd);
 
   v_n := coalesce(array_length(v_rows, 1), 0);
-  if v_n = 0 then return jsonb_build_object('due', 0); end if;
-
   v_text := crm_soat_list_text('🔔 SOAT por vencer (' || v_n || '):', v_rows);
 
-  perform crm_notify('🔔 ' || v_n || ' SOAT por vencer',
+  if v_n > 0 then perform crm_notify('🔔 ' || v_n || ' SOAT por vencer',
                      (select string_agg(r.plate || ' ' || crm_soat_days_text(r.end_date), ' · ' order by r.end_date) from unnest(v_rows) r),
-                     '/admin?tab=soat', 'soat-daily');
+                     '/admin?tab=soat', 'soat-daily'); end if;
 
-  -- WhatsApp a los asesores (lo envía el servidor del sitio con Gupshup)
+  -- WhatsApp a los asesores: el servidor decide si hay recordatorios pendientes para enviarles (lo envía el servidor del sitio con Gupshup)
   select regexp_replace(value, '/api/.*$', '') into v_base from crm_private_config where key = 'push_url';
   select value into v_secret from crm_private_config where key = 'push_secret';
   if v_base is not null and v_secret is not null then

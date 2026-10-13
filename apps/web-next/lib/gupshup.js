@@ -47,6 +47,21 @@ export async function sendText(sb, phone, text, sentBy = "botmazo") {
   return gs;
 }
 
+// Cualquier mensaje de sesión ya armado (texto, imagen, botones…), p. ej. los que
+// devuelve crm_advisor_reminders. Solo dentro de la ventana de 24 h.
+export async function sendMessage(sb, phone, message, logText, sentBy = "botmazo") {
+  const gs = await post("msg", { destination: phone, message: JSON.stringify(message) });
+  await sb.rpc("crm_log_outbound", {
+    p_phone: phone,
+    p_body: logText || message.text || message.caption || `[${message.type}]`,
+    p_wa_message_id: gs.messageId || null,
+    p_sent_by: sentBy,
+    p_status: gs.status || "submitted",
+    p_raw: gs,
+  });
+  return gs;
+}
+
 // Plantilla aprobada por Meta (sirve fuera de la ventana de 24 h).
 // imageUrl: si la plantilla tiene encabezado de imagen, el enlace público de la imagen.
 export async function sendTemplate(sb, phone, templateId, params, logText, sentBy = "botmazo", imageUrl = null) {
