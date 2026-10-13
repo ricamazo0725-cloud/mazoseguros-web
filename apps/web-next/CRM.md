@@ -20,6 +20,7 @@ La anon key del sitio no puede ejecutar ninguna de estas funciones. Solo las usa
 | `crm_log_inbound(phone, wa_name, body, type, wa_message_id, raw)` | Registra un mensaje entrante. Crea o actualiza el contacto y no duplica si Gupshup reintenta. |
 | `crm_log_outbound(phone, body, wa_message_id, sent_by, status, raw)` | Registra un mensaje enviado por el bot o por un asesor. |
 | `crm_update_status(wa_message_id, status, alt_id)` | Actualiza el estado de entrega (sent, delivered, read o failed). Nunca retrocede de estado. |
+| `crm_import_contacts(rows, mode)` | Crea clientes desde el admin (`manual`) o los importa en bloque desde CSV/JSON (`import`). Empareja por documento y luego por teléfono; en `import` solo completa datos vacíos. Archivo: `crm_contacts_import.sql`. |
 | `crm_available_slots(day)` | Devuelve los horarios libres de un día en hora de Colombia. Lo usa el admin y lo usará BotMazo para ofrecer citas. |
 
 ## App en el celular: avisos push y respuestas por WhatsApp

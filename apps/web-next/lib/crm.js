@@ -79,6 +79,21 @@ export async function listContacts({ search = "", status = "", source = "" } = {
   return check(await q) ?? [];
 }
 
+// Crea (mode "manual") o importa en bloque (mode "import") clientes. Ver crm_contacts_import.sql.
+// rows: [{ nombre, tipo_documento, documento, telefono, email, ciudad, interes, estado, notas, carpeta_cliente }]
+// Devuelve [{ fila, resultado: creado|actualizado|existe|error, detalle, contact_id }]
+export async function importContacts(rows, mode = "import", onProgress) {
+  const CHUNK = 500;
+  const out = [];
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const part = rows.slice(i, i + CHUNK);
+    const res = check(await need().rpc("crm_import_contacts", { p_rows: part, p_mode: mode })) ?? [];
+    out.push(...res.map((r) => ({ ...r, fila: r.fila + i })));
+    onProgress?.(Math.min(i + CHUNK, rows.length), rows.length);
+  }
+  return out;
+}
+
 export async function getContact(id) {
   return check(await need().from("crm_contacts").select("*").eq("id", id).maybeSingle());
 }

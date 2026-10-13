@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactPolicies } from "@/components/admin/PoliciesPanel";
 import { MessageMedia, VoiceRecorder, isMediaMessage } from "@/components/admin/ChatMedia";
+import { NewContactForm, ContactImport } from "@/components/admin/ContactCreate";
 import {
   CONTACT_STATUS,
   LEAD_SOURCE,
@@ -30,6 +31,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const [source, setSource] = useState("");
   const [selectedId, setSelectedId] = useState(initialContactId || null);
   const [error, setError] = useState("");
+  const [mode, setMode] = useState(null); // null | "new" | "import"
 
   const refresh = useCallback(() => {
     listContacts({ search, status, source })
@@ -63,13 +65,33 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   }, [selectedId, contacts, extra]);
 
   const selected = contacts.find((c) => c.id === selectedId) || (extra?.id === selectedId ? extra : null);
+  const open = (id) => {
+    setMode(null);
+    setSelectedId(id);
+    refresh();
+  };
+  const showRight = selectedId || mode;
 
   return (
     <div className="grid gap-6 md:grid-cols-[320px_1fr]">
-      <aside className={`space-y-3 ${selectedId ? "hidden md:block" : ""}`}>
+      <aside className={`space-y-3 ${showRight ? "hidden md:block" : ""}`}>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setMode("new")}
+            className={`flex-1 text-xs font-mono px-3 py-2 rounded border ${mode === "new" ? "border-accent text-accent" : "border-border hover:border-accent"}`}
+          >
+            + Nuevo cliente
+          </button>
+          <button
+            onClick={() => setMode("import")}
+            className={`flex-1 text-xs font-mono px-3 py-2 rounded border ${mode === "import" ? "border-accent text-accent" : "border-border hover:border-accent"}`}
+          >
+            📂 Importar
+          </button>
+        </div>
         <input
           className={input}
-          placeholder="Buscar por nombre o teléfono"
+          placeholder="Buscar por nombre, teléfono o documento"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -99,7 +121,10 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
           {contacts.map((c) => (
             <li key={c.id}>
               <button
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => {
+                  setMode(null);
+                  setSelectedId(c.id);
+                }}
                 className={`w-full text-left doc-card p-3 focus-ring ${
                   c.id === selectedId ? "border-accent" : ""
                 }`}
@@ -129,16 +154,23 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
         </ul>
       </aside>
 
-      <section className={selectedId ? "" : "hidden md:block"}>
-        {selectedId && (
+      <section className={showRight ? "" : "hidden md:block"}>
+        {showRight && (
           <button
-            onClick={() => setSelectedId(null)}
+            onClick={() => {
+              setMode(null);
+              setSelectedId(null);
+            }}
             className="md:hidden mb-3 text-xs font-mono text-muted hover:text-accent"
           >
             ← Contactos
           </button>
         )}
-        {selected ? (
+        {mode === "new" ? (
+          <NewContactForm onCreated={open} onOpen={open} onCancel={() => setMode(null)} />
+        ) : mode === "import" ? (
+          <ContactImport onDone={refresh} onOpen={open} onCancel={() => setMode(null)} />
+        ) : selected ? (
           <ContactDetail key={selected.id} contact={selected} onSaved={refresh} onSchedule={onSchedule} />
         ) : (
           <div className="doc-card p-10 text-center text-muted text-sm">
