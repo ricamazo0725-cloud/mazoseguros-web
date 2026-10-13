@@ -11,6 +11,7 @@ import {
   getLeads,
   TOPICS,
   listContacts,
+  listAdvisorNames,
   updateContact,
   deleteContact,
   getContact,
@@ -34,18 +35,23 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [source, setSource] = useState("");
+  const [advisor, setAdvisor] = useState("");
+  const [advisorNames, setAdvisorNames] = useState([]);
+  useEffect(() => {
+    listAdvisorNames().then(setAdvisorNames).catch(() => {});
+  }, []);
   const [selectedId, setSelectedId] = useState(initialContactId || null);
   const [error, setError] = useState("");
   const [mode, setMode] = useState(null); // null | "new" | "import"
 
   const refresh = useCallback(() => {
-    listContacts({ search, status, source })
+    listContacts({ search, status, source, advisor })
       .then((rows) => {
         setContacts(rows);
         setError("");
       })
       .catch((e) => setError(e.message));
-  }, [search, status, source]);
+  }, [search, status, source, advisor]);
 
   useEffect(() => {
     const t = setTimeout(refresh, 250); // espera a que termine de escribir
@@ -118,6 +124,20 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
               </option>
             ))}
         </select>
+        <select className={input} value={advisor} onChange={(e) => setAdvisor(e.target.value)}>
+          <option value="">Todos los asesores</option>
+          <option value="__none">Sin asesor asignado</option>
+          {advisorNames.map((n) => (
+            <option key={n} value={n}>
+              👤 {n}
+            </option>
+          ))}
+        </select>
+        <datalist id="crm-advisor-names">
+          {advisorNames.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
         {error && <p className="text-xs text-danger font-mono">{error}</p>}
         <ul className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
           {contacts.length === 0 && !error && (
@@ -151,7 +171,10 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
                   </span>
                 </div>
                 <div className="text-[11px] text-muted mt-1 flex justify-between gap-2">
-                  <span>{LEAD_SOURCE[c.lead_source] || ""}</span>
+                  <span>
+                    {LEAD_SOURCE[c.lead_source] || ""}
+                    {c.advisor && <> · 👤 {c.advisor}</>}
+                  </span>
                   {c.last_message_at && <span>{fmtDateTime(c.last_message_at)}</span>}
                 </div>
               </button>
@@ -209,6 +232,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
     doc_number: contact.doc_number || "",
     city: contact.city || "",
     birth_date: contact.birth_date || "",
+    advisor: contact.advisor || "",
     notify_opt_out: !!contact.notify_opt_out,
     phone: contact.phone || "",
     onedrive_folder: contact.onedrive_folder || "",
@@ -255,6 +279,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
         doc_number: form.doc_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() || null,
         city: form.city || null,
         birth_date: form.birth_date || null,
+        ...(contact.advisor !== undefined ? { advisor: form.advisor.trim() || null } : {}),
         ...(contact.notify_opt_out !== undefined ? { notify_opt_out: form.notify_opt_out } : {}),
       });
       setSaved(true);
@@ -359,6 +384,18 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
           </div>
+          {contact.advisor !== undefined && (
+            <div className="space-y-1">
+              <label className={label}>Asesor</label>
+              <input
+                className={input}
+                list="crm-advisor-names"
+                value={form.advisor}
+                placeholder="Asesor responsable"
+                onChange={(e) => setForm({ ...form, advisor: e.target.value })}
+              />
+            </div>
+          )}
           <div className="space-y-1">
             <label className={label}>Fecha de nacimiento</label>
             <input

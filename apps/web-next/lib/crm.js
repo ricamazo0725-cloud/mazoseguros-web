@@ -51,6 +51,7 @@ export const TOPICS = {
   salud: "Salud",
   vida: "Vida",
   "obras-civiles": "Obras civiles",
+  arriendo: "Arrendamiento",
   otro: "Otro",
 };
 
@@ -66,7 +67,7 @@ function check({ data, error }) {
 
 // ───────────── Contactos y mensajes ─────────────
 
-export async function listContacts({ search = "", status = "", source = "" } = {}) {
+export async function listContacts({ search = "", status = "", source = "", advisor = "" } = {}) {
   let q = need()
     .from("crm_contacts")
     .select("*")
@@ -74,6 +75,8 @@ export async function listContacts({ search = "", status = "", source = "" } = {
     .limit(200);
   if (status) q = q.eq("status", status);
   if (source) q = q.eq("lead_source", source);
+  if (advisor === "__none") q = q.is("advisor", null);
+  else if (advisor) q = q.eq("advisor", advisor);
   const term = search.trim().replace(/[%,()]/g, "");
   if (term) q = q.or(`name.ilike.%${term}%,wa_name.ilike.%${term}%,phone.ilike.%${term.replace(/\D/g, "") || term}%,doc_number.ilike.%${term}%`);
   return check(await q) ?? [];
@@ -92,6 +95,16 @@ export async function importContacts(rows, mode = "import", onProgress) {
     onProgress?.(Math.min(i + CHUNK, rows.length), rows.length);
   }
   return out;
+}
+
+// Nombres de asesores para sugerir/filtrar: los de crm_advisors + los ya asignados a clientes
+export async function listAdvisorNames() {
+  const names = new Set();
+  const a = await need().from("crm_advisors").select("name").not("name", "is", null);
+  (a.data || []).forEach((r) => r.name && names.add(r.name.trim()));
+  const c = await need().from("crm_contacts").select("advisor").not("advisor", "is", null).limit(2000);
+  (c.data || []).forEach((r) => r.advisor && names.add(r.advisor.trim()));
+  return [...names].filter(Boolean).sort((x, y) => x.localeCompare(y, "es"));
 }
 
 export async function getContact(id) {
