@@ -102,6 +102,11 @@ export async function updateContact(id, patch) {
   return check(await need().from("crm_contacts").update(patch).eq("id", id).select().single());
 }
 
+// Borra el contacto con su conversación, leads y pólizas (las citas y los SOAT quedan sin cliente)
+export async function deleteContact(id) {
+  check(await need().from("crm_contacts").delete().eq("id", id));
+}
+
 export async function getMessages(contactId) {
   return (
     check(

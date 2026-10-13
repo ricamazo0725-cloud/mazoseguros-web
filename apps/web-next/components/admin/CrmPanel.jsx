@@ -12,6 +12,7 @@ import {
   TOPICS,
   listContacts,
   updateContact,
+  deleteContact,
   getContact,
   getMessages,
   markRead,
@@ -172,7 +173,17 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
         ) : mode === "import" ? (
           <ContactImport onDone={refresh} onOpen={open} onCancel={() => setMode(null)} />
         ) : selected ? (
-          <ContactDetail key={selected.id} contact={selected} onSaved={refresh} onSchedule={onSchedule} />
+          <ContactDetail
+            key={selected.id}
+            contact={selected}
+            onSaved={refresh}
+            onSchedule={onSchedule}
+            onDeleted={() => {
+              setSelectedId(null);
+              setExtra(null);
+              refresh();
+            }}
+          />
         ) : (
           <div className="doc-card p-10 text-center text-muted text-sm">
             Elige un contacto para ver su ficha y la conversación.
@@ -183,7 +194,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
   );
 }
 
-function ContactDetail({ contact, onSaved, onSchedule }) {
+function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
   const [form, setForm] = useState({
     name: contact.name || "",
     email: contact.email || "",
@@ -193,8 +204,12 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
     doc_type: contact.doc_type || "",
     doc_number: contact.doc_number || "",
     city: contact.city || "",
+    phone: contact.phone || "",
+    onedrive_folder: contact.onedrive_folder || "",
   });
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState([]);
   const bottomRef = useRef(null);
 
@@ -215,19 +230,55 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
   }, [messages.length]);
 
   async function save() {
-    await updateContact(contact.id, {
-      name: form.name || null,
-      email: form.email || null,
-      status: form.status,
-      interest: form.interest || null,
-      notes: form.notes || null,
-      doc_type: form.doc_type || null,
-      doc_number: form.doc_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() || null,
-      city: form.city || null,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    onSaved();
+    setSaveError("");
+    let phone = form.phone.replace(/\D/g, "");
+    if (phone.length === 10 && phone.startsWith("3")) phone = "57" + phone;
+    if (phone && phone.length < 10) return setSaveError("El teléfono está incompleto.");
+    if (!form.name.trim() && !contact.wa_name) return setSaveError("Escribe el nombre.");
+    setBusy(true);
+    try {
+      await updateContact(contact.id, {
+        phone: phone || null,
+        onedrive_folder: form.onedrive_folder.trim() || null,
+        name: form.name || null,
+        email: form.email || null,
+        status: form.status,
+        interest: form.interest || null,
+        notes: form.notes || null,
+        doc_type: form.doc_type || null,
+        doc_number: form.doc_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() || null,
+        city: form.city || null,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      onSaved();
+    } catch (e) {
+      setSaveError(
+        e.code === "23505"
+          ? "Ese teléfono o documento ya pertenece a otro contacto."
+          : e.message || "No se pudo guardar."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    const who = contact.name || contact.wa_name || (contact.phone ? `+${contact.phone}` : "este contacto");
+    if (
+      !window.confirm(
+        `¿Eliminar a ${who}?\n\nSe borran su conversación, leads y pólizas. Las citas y los SOAT quedan sin cliente asignado.\nEsto no se puede deshacer.`
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await deleteContact(contact.id);
+      onDeleted?.();
+    } catch (e) {
+      setSaveError(e.message || "No se pudo eliminar.");
+      setBusy(false);
+    }
   }
 
   return (
@@ -291,6 +342,16 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
             </div>
           </div>
           <div className="space-y-1">
+            <label className={label}>Teléfono / WhatsApp</label>
+            <input
+              className={input}
+              value={form.phone}
+              inputMode="tel"
+              placeholder="300 123 4567"
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
             <label className={label}>Ciudad</label>
             <input className={input} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           </div>
@@ -321,6 +382,15 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
           </div>
         </div>
         <div className="space-y-1">
+          <label className={label}>Carpeta en OneDrive</label>
+          <input
+            className={input}
+            value={form.onedrive_folder}
+            placeholder="Clientes/Nombre del cliente"
+            onChange={(e) => setForm({ ...form, onedrive_folder: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
           <label className={label}>Notas</label>
           <textarea
             rows={3}
@@ -329,11 +399,19 @@ function ContactDetail({ contact, onSaved, onSchedule }) {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={save} className="btn-cta text-xs py-2 px-4">
-            Guardar ficha
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={save} disabled={busy} className="btn-cta text-xs py-2 px-4">
+            {busy ? "Guardando…" : "Guardar cambios"}
           </button>
           {saved && <span className="text-xs text-accent font-mono">Guardado ✓</span>}
+          {saveError && <span className="text-xs text-danger font-mono">{saveError}</span>}
+          <button
+            onClick={remove}
+            disabled={busy}
+            className="ml-auto text-xs font-mono px-3 py-2 rounded border border-border text-muted hover:border-danger hover:text-danger"
+          >
+            🗑 Eliminar cliente
+          </button>
         </div>
       </div>
 
