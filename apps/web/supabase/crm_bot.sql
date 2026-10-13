@@ -41,6 +41,13 @@ security definer set search_path = public as $$
     ('vida',          'Vida',                'Protección económica para tu familia ante fallecimiento, incapacidad o enfermedades graves.'),
     ('propiedades',   'Hogar y propiedades', 'Protege tu casa, apartamento o local ante incendio, robo o desastres naturales.'),
     ('obras-civiles', 'Obras civiles',       'Pólizas para constructoras y contratistas: cumplimiento, responsabilidad y todo riesgo.'),
+    ('arriendo',      'Arrendamiento',
+     E'*Arrienda tu casa o apartamento con total seguridad* 🏡\n\n' ||
+     E'Protegemos tu propiedad frente a cualquier imprevisto:\n' ||
+     E'🔹 *$0* en gastos de estudio y contrato.\n' ||
+     E'🔹 *Sin codeudor* para arriendos de hasta $2.000.000.\n' ||
+     E'🔹 *Garantía* de hasta 12 meses de arriendo y administración.\n' ||
+     E'🔹 *Cobertura* de servicios públicos y emergencias en el hogar.'),
     ('otro',          'Otro seguro',         'Cuéntale al asesor qué necesitas proteger y te ayudamos a encontrar la póliza.')
   )
   select jsonb_build_object(
@@ -56,6 +63,7 @@ $$;
 -- Detecta el tipo de seguro en un texto libre ("quiero cotizar un seguro de autos")
 create or replace function crm_detect_topic(p text) returns text language sql immutable as $$
   select case
+    when p ~ '\m(arriendo|arriendos|arrendamiento|arrendar|arrienda|arrendatario|inquilino|inquilinos|codeudor|canon)\M' then 'arriendo'
     when p ~ '\m(auto|autos|carro|carros|vehiculo|vehiculos|moto|motos|soat|todo riesgo)\M' then 'auto'
     when p ~ '\m(salud|prepagada|medicina|eps|medico)\M' then 'salud'
     when p ~ '\m(vida|exequial|exequiales|funerario)\M' then 'vida'
@@ -141,6 +149,7 @@ create or replace function crm_bot_menu(p_name text) returns jsonb language sql 
         jsonb_build_object('id', 's_salud', 'title', '🩺 Salud', 'description', 'Planes de salud y prepagada'),
         jsonb_build_object('id', 's_vida', 'title', '❤️ Vida', 'description', 'Protección para tu familia'),
         jsonb_build_object('id', 's_propiedades', 'title', '🏠 Hogar y propiedades', 'description', 'Casa, apartamento o local'),
+        jsonb_build_object('id', 's_arriendo', 'title', '🔑 Arrendamiento', 'description', 'Arrienda sin codeudor y con garantía'),
         jsonb_build_object('id', 's_obras-civiles', 'title', '🏗️ Obras civiles', 'description', 'Cumplimiento y todo riesgo')))
     ),
     'Mazoseguros'
@@ -151,7 +160,9 @@ create or replace function crm_bot_service(p_topic text) returns jsonb language 
   select crm_msg_buttons(
     (i ->> 'description') ||
       coalesce(E'\n\n' || (select string_agg('✔️ ' || c, E'\n') from jsonb_array_elements_text(i -> 'coverage') c), '') ||
-      E'\n\n¿Quieres una asesoría gratuita con uno de nuestros asesores?',
+      case when p_topic = 'arriendo'
+        then E'\n\n📲 *¿Quieres asegurar el pago de tu arriendo?* Te asesoramos sin costo.'
+        else E'\n\n¿Quieres una asesoría gratuita con uno de nuestros asesores?' end,
     jsonb_build_array(
       jsonb_build_object('id', 'm_agendar', 'title', '📅 Agendar asesoría'),
       jsonb_build_object('id', 'm_asesor', 'title', '💬 Hablar con asesor'),
@@ -170,6 +181,7 @@ create or replace function crm_bot_topics() returns jsonb language sql stable as
       jsonb_build_object('id', 't_salud', 'title', '🩺 Salud'),
       jsonb_build_object('id', 't_vida', 'title', '❤️ Vida'),
       jsonb_build_object('id', 't_propiedades', 'title', '🏠 Hogar y propiedades'),
+      jsonb_build_object('id', 't_arriendo', 'title', '🔑 Arrendamiento'),
       jsonb_build_object('id', 't_obras-civiles', 'title', '🏗️ Obras civiles'),
       jsonb_build_object('id', 't_otro', 'title', '➕ Otro')))))
 $$;
