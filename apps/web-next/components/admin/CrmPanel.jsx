@@ -22,6 +22,7 @@ import {
   fmtDateTime,
   birthdayInfo,
   birthdayLabel,
+  sendBirthdayGreeting,
   waLink,
 } from "@/lib/crm";
 
@@ -368,6 +369,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
               onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
             />
             {form.birth_date && <p className="text-xs font-mono text-accent">{birthdayLabel(form.birth_date)}</p>}
+            {contact.birth_date && <BirthdayGreetButton contactId={contact.id} />}
           </div>
           <div className="space-y-1">
             <label className={label}>Ciudad</label>
@@ -485,6 +487,34 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
           }}
         />
       </div>
+    </div>
+  );
+}
+
+// Enviar ya la felicitación de cumpleaños (muestra el texto antes de enviarlo)
+function BirthdayGreetButton({ contactId }) {
+  const [state, setState] = useState("");
+  return (
+    <div className="text-xs font-mono space-y-1">
+      <button
+        type="button"
+        className="text-muted hover:text-accent"
+        disabled={state === "…"}
+        onClick={async () => {
+          try {
+            setState("…");
+            const text = await sendBirthdayGreeting(contactId, true);
+            if (!window.confirm(`Se enviará por WhatsApp y correo:\n\n${text.replace(/\*/g, "")}`)) return setState("");
+            const r = await sendBirthdayGreeting(contactId);
+            setState(r?.log?.map((l) => `${l.channel === "email" ? "✉️" : "💬"} ${l.status}${l.detail ? ` (${l.detail})` : ""}`).join(" · ") || "listo");
+          } catch (e) {
+            setState("⚠️ " + e.message);
+          }
+        }}
+      >
+        🎂 Enviar felicitación
+      </button>
+      {state && state !== "…" && <p className="text-muted">{state}</p>}
     </div>
   );
 }

@@ -236,6 +236,21 @@ export function birthdayLabel(birthDate) {
   return `${b.turns - 1} años`;
 }
 
+// Felicitación de cumpleaños al cliente (WhatsApp + correo). preview=true solo devuelve el texto.
+export async function sendBirthdayGreeting(contactId, preview = false) {
+  const { data } = await need().auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
+  const res = await fetch("/api/crm/birthdays/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ contactId, preview }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
+  return preview ? body.preview : body.results?.[0];
+}
+
 export function waLink(phone) {
   return `https://wa.me/${String(phone || "").replace(/\D/g, "")}`;
 }

@@ -64,3 +64,7 @@ Ejecuta `crm_birthdays.sql` (y vuelve a correr `crm_contacts_import.sql` y `crm_
 3. La tecnomecánica se registra en la pestaña **SOAT → 🔧 Tecnomecánica**, en la ficha del cliente o por el bot con `rtm ABC123 01/04/2027`.
 4. Cada día a las 9 a. m. se avisa al cliente 30, 15 y 3 días antes del vencimiento por WhatsApp (plantilla; texto libre si escribió en las últimas 24 h) y por correo. Todo queda en `crm_notifications` (“📨 Recordatorios enviados” en la pestaña SOAT). Si no salió por ningún canal se reintenta al día siguiente.
 5. En la ficha del cliente se pueden desactivar sus recordatorios; en cada tarjeta hay **📨 Enviar recordatorio** para mandarlo ya.
+
+### Felicitación de cumpleaños al cliente
+
+`crm_birthdays.sql` (córrelo después de `crm_vehicle_reminders.sql`) programa a las 9:10 a. m. la felicitación: WhatsApp (plantilla `GUPSHUP_TPL_CUMPLEANOS_ID`, o texto si escribió en las últimas 24 h) y correo. El mensaje cambia según el cliente: con pólizas vigentes recuerda el acompañamiento posventa (siniestros, reclamaciones, cambios), menciona la póliza que vence en los próximos 60 días, ofrece una revisión gratuita de pólizas y pide referidos; sin pólizas ofrece una asesoría gratuita. Se envía una vez por año; en la ficha está **🎂 Enviar felicitación** con vista previa.

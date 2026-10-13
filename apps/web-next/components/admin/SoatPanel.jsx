@@ -352,7 +352,7 @@ function NotificationsLog() {
   const [rows, setRows] = useState(null);
   return (
     <details className="doc-card p-4" onToggle={(e) => e.currentTarget.open && !rows && listNotifications().then(setRows).catch(() => setRows([]))}>
-      <summary className="cursor-pointer font-display font-semibold">📨 Recordatorios enviados a clientes</summary>
+      <summary className="cursor-pointer font-display font-semibold">📨 Mensajes automáticos enviados a clientes</summary>
       <p className="text-xs text-muted mt-2">
         Cada día a las 9 a. m. se avisa al cliente 30, 15 y 3 días antes del vencimiento del SOAT y de la tecnomecánica,
         por WhatsApp y correo.
@@ -362,7 +362,7 @@ function NotificationsLog() {
         {rows?.length === 0 && <li className="text-muted">Todavía no se ha enviado ninguno.</li>}
         {rows?.map((n) => (
           <li key={n.id} className={n.status === "error" ? "text-danger" : n.status === "omitido" ? "text-muted" : ""}>
-            {fmtDateTime(n.created_at)} · {n.plate} {n.kind === "soat" ? "SOAT" : "RTM"} · {n.channel === "email" ? "✉️" : "💬"}{" "}
+            {fmtDateTime(n.created_at)} · {n.kind === "cumpleanos" ? "🎂 Cumpleaños" : `${n.plate} ${n.kind === "soat" ? "SOAT" : "RTM"}`} · {n.channel === "email" ? "✉️" : "💬"}{" "}
             {n.destination || ""} · {n.status}
             {n.detail ? ` (${n.detail})` : ""}
           </li>
