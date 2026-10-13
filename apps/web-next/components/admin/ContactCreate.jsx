@@ -31,7 +31,7 @@ const ALIASES = {
   bien_asegurado: ["bien asegurado", "vehiculo", "riesgo", "insured item"],
   fecha_expedicion: ["fecha expedicion", "expedicion", "issue date"],
   inicio_vigencia: ["inicio vigencia", "inicio de vigencia", "vigencia desde", "desde", "start date"],
-  fin_vigencia: ["fin vigencia", "fin de vigencia", "vencimiento", "vigencia hasta", "hasta", "end date"],
+  fin_vigencia: ["fin vigencia", "fin de vigencia", "vencimiento", "fecha vencimiento", "fecha de vencimiento", "vence", "vigencia hasta", "hasta", "end date"],
   prima: ["prima", "valor prima", "premium"],
   ruta_archivo: ["ruta archivo", "ruta", "file path"],
   enlace_archivo: ["enlace archivo", "enlace", "link", "file url"],
@@ -97,12 +97,26 @@ function parseCsv(text) {
   return rows.filter((r) => r.some((c) => c.trim() !== ""));
 }
 
+// "HERNANDEZ FRANCO, DORALBA" → "Doralba Hernandez Franco" (para que el saludo use el nombre de pila)
+export function fixName(n) {
+  let s = String(n || "").replace(/\s+/g, " ").trim();
+  const parts = s.split(",");
+  if (parts.length === 2 && parts[0].trim() && parts[1].trim()) s = `${parts[1].trim()} ${parts[0].trim()}`;
+  if (s && s === s.toUpperCase()) {
+    s = s.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
+      .replace(/\b(De|Del|La|Las|Los|Y)\b/g, (w) => w.toLowerCase())
+      .replace(/\b(Sas|S\.a\.s\.?|Ltda|S\.a\.?|Bic)\b/gi, (w) => w.toUpperCase());
+  }
+  return s;
+}
+
 function mapObject(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj || {})) {
     const f = HEADER_MAP[norm(k)];
     if (f && v != null && String(v).trim() !== "" && out[f] == null) out[f] = String(v).trim();
   }
+  if (out.nombre) out.nombre = fixName(out.nombre);
   return out;
 }
 
@@ -133,6 +147,7 @@ export function parseClients(text) {
       const v = (cells[i] ?? "").trim();
       if (f && v && o[f] == null) o[f] = v;
     });
+    if (o.nombre) o.nombre = fixName(o.nombre);
     return o;
   });
   return { rows, unknown: header.filter((h, i) => !fields[i] && h.trim()), format: "CSV" };
@@ -271,6 +286,7 @@ export function NewContactForm({ onCreated, onOpen, onCancel }) {
 export function ContactImport({ onDone, onOpen, onCancel }) {
   const [text, setText] = useState("");
   const [soloSoat, setSoloSoat] = useState(false);
+  const [xlsx, setXlsx] = useState(null); // { file, sheets, sheet }
   const [fileName, setFileName] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
@@ -321,8 +337,12 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
     // Excel (.xlsx): primera hoja → CSV con ; para reutilizar la vista previa
     if (/\.xlsx$/i.test(file.name)) {
       try {
-        const readXlsxFile = (await import("read-excel-file")).default;
-        const rows = await readXlsxFile(file);
+        const mod = await import("read-excel-file");
+        const readXlsxFile = mod.default;
+        const sheets = (await mod.readSheetNames(file)) || [];
+        const sheet = typeof e.sheet === "string" ? e.sheet : sheets[0];
+        setXlsx({ file, sheets, sheet });
+        const rows = await readXlsxFile(file, { sheet });
         const cell = (v) => {
           if (v == null) return "";
           if (v instanceof Date) return v.toISOString().slice(0, 10);
@@ -334,7 +354,7 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
         setText("");
         alert("No se pudo leer el Excel: " + err.message);
       }
-      e.target.value = "";
+      if (e.target) e.target.value = "";
       return;
     }
     const buf = await file.arrayBuffer();
@@ -390,6 +410,20 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
           ⬇️ Descargar plantilla
         </button>
         {fileName && <span className="text-xs font-mono text-muted self-center">{fileName}</span>}
+        {xlsx?.sheets?.length > 1 && fileName === xlsx.file.name && (
+          <select
+            className="text-xs font-mono px-2 py-1 rounded border border-border bg-background"
+            value={xlsx.sheet}
+            onChange={(ev) => onFile({ target: { files: [xlsx.file] }, sheet: ev.target.value })}
+            title="Hoja del Excel"
+          >
+            {xlsx.sheets.map((n) => (
+              <option key={n} value={n}>
+                Hoja: {n}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <textarea

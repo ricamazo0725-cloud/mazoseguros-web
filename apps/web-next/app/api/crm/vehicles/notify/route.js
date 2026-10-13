@@ -27,6 +27,27 @@ function when(days) {
 const firstName = (n) => (String(n || "").trim().split(/\s+/)[0] || "").replace(/^./, (c) => c.toUpperCase());
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
+// Parámetros de la plantilla de Meta en el orden de {{1}}, {{2}}…; se configura con
+// GUPSHUP_TPL_VENCIMIENTO_PARAMS (por defecto "nombre,documento,placa,fecha"). Valores posibles:
+// nombre (nombre de pila), nombre_completo, documento (SOAT / revisión técnico-mecánica), placa,
+// fecha (30 de marzo de 2027), fecha_corta (30/03/2027), dias, aseguradora
+function templateParams(it) {
+  const order = (process.env["GUPSHUP_TPL_VENCIMIENTO_PARAMS"] || "nombre,documento,placa,fecha")
+    .split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const [y, m, d] = String(it.expiry).split("-");
+  const values = {
+    nombre: firstName(it.name) || "cliente",
+    nombre_completo: String(it.name || "cliente").trim(),
+    documento: LABEL[it.kind],
+    placa: it.plate,
+    fecha: fmt(it.expiry),
+    fecha_corta: `${d}/${m}/${y}`,
+    dias: String(it.days_left),
+    aseguradora: it.extra || "",
+  };
+  return order.map((k) => (values[k] ?? "").toString().replace(/\s+/g, " ").trim() || "-");
+}
+
 function messages(it) {
   const doc = LABEL[it.kind];
   const name = firstName(it.name);
@@ -74,7 +95,7 @@ async function notifyOne(sb, it, { mark }) {
         await sendText(sb, it.phone, wa, "recordatorio");
         log.push({ ...base, channel: "whatsapp", destination: it.phone, status: "enviado", detail: "texto (ventana 24 h abierta)" });
       } else if (tpl) {
-        await sendTemplate(sb, it.phone, tpl, [firstName(it.name) || "cliente", LABEL[it.kind], it.plate, fmt(it.expiry)], wa, "recordatorio");
+        await sendTemplate(sb, it.phone, tpl, templateParams(it), wa, "recordatorio");
         log.push({ ...base, channel: "whatsapp", destination: it.phone, status: "enviado", detail: "plantilla" });
       } else {
         log.push({ ...base, channel: "whatsapp", destination: it.phone, status: "omitido",
