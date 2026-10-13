@@ -47,9 +47,12 @@ export async function sendText(sb, phone, text, sentBy = "botmazo") {
   return gs;
 }
 
-// Plantilla aprobada por Meta (sirve fuera de la ventana de 24 h)
-export async function sendTemplate(sb, phone, templateId, params, logText, sentBy = "botmazo") {
-  const gs = await post("template/msg", { destination: phone, template: JSON.stringify({ id: templateId, params }) });
+// Plantilla aprobada por Meta (sirve fuera de la ventana de 24 h).
+// imageUrl: si la plantilla tiene encabezado de imagen, el enlace público de la imagen.
+export async function sendTemplate(sb, phone, templateId, params, logText, sentBy = "botmazo", imageUrl = null) {
+  const fields = { destination: phone, template: JSON.stringify({ id: templateId, params }) };
+  if (imageUrl) fields.message = JSON.stringify({ type: "image", image: { link: imageUrl } });
+  const gs = await post("template/msg", fields);
   await sb.rpc("crm_log_outbound", {
     p_phone: phone,
     p_body: logText,

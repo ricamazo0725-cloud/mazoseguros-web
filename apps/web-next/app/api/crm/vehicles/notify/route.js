@@ -95,7 +95,7 @@ async function notifyOne(sb, it, { mark }) {
         await sendText(sb, it.phone, wa, "recordatorio");
         log.push({ ...base, channel: "whatsapp", destination: it.phone, status: "enviado", detail: "texto (ventana 24 h abierta)" });
       } else if (tpl) {
-        await sendTemplate(sb, it.phone, tpl, templateParams(it), wa, "recordatorio");
+        await sendTemplate(sb, it.phone, tpl, templateParams(it), wa, "recordatorio", process.env["GUPSHUP_TPL_VENCIMIENTO_IMAGE"] || null);
         log.push({ ...base, channel: "whatsapp", destination: it.phone, status: "enviado", detail: "plantilla" });
       } else {
         log.push({ ...base, channel: "whatsapp", destination: it.phone, status: "omitido",
