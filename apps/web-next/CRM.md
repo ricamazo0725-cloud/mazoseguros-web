@@ -52,3 +52,7 @@ Desde la conversación puedes responder por WhatsApp. Al enviar, BotMazo se paus
    - `modo cliente` prueba el bot como cliente por 2 h; `modo asesor` vuelve.
 4. Todos los días a las 8 a. m. (Colombia) `crm_soat_daily()` avisa los SOAT que vencen en 30, 15, 5, 1 y 0 días: aviso push al admin y WhatsApp a los asesores (texto libre si escribieron en las últimas 24 h; si no, con la plantilla).
 5. El SOAT se guarda aparte de `crm_policies`: un cliente de autos puede tener su póliza de autos y además su SOAT.
+
+## Cumpleaños
+
+Ejecuta `crm_birthdays.sql` (y vuelve a correr `crm_contacts_import.sql` y `crm_soat.sql`). Agrega `crm_contacts.birth_date`, que se edita en la ficha del cliente, en "Nuevo cliente" o se importa con la columna `fecha_nacimiento`. Cada día a las 8 a. m. llega un aviso push con quienes cumplen años; en la lista del CRM aparece 🎂 y en el modo asesor del bot `cumpleaños` (o `cumpleaños 30`) lista los próximos.

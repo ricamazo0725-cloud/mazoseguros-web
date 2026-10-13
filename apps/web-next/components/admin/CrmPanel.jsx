@@ -20,6 +20,8 @@ import {
   setBotActive,
   REPLY_WINDOW_MS,
   fmtDateTime,
+  birthdayInfo,
+  birthdayLabel,
   waLink,
 } from "@/lib/crm";
 
@@ -142,6 +144,7 @@ export default function CrmPanel({ onSchedule, initialContactId }) {
                 <div className="text-xs font-mono text-muted flex justify-between gap-2">
                   <span>{c.phone ? `+${c.phone}` : c.doc_number || "sin teléfono"}</span>
                   <span>
+                    {birthdayInfo(c.birth_date)?.days === 0 && "🎂 "}
                     {c.bot_state === "asesor" && "🙋 "}
                     {CONTACT_STATUS[c.status] || c.status}
                   </span>
@@ -204,6 +207,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
     doc_type: contact.doc_type || "",
     doc_number: contact.doc_number || "",
     city: contact.city || "",
+    birth_date: contact.birth_date || "",
     phone: contact.phone || "",
     onedrive_folder: contact.onedrive_folder || "",
   });
@@ -248,6 +252,7 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
         doc_type: form.doc_type || null,
         doc_number: form.doc_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() || null,
         city: form.city || null,
+        birth_date: form.birth_date || null,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -350,6 +355,17 @@ function ContactDetail({ contact, onSaved, onSchedule, onDeleted }) {
               placeholder="300 123 4567"
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
+          </div>
+          <div className="space-y-1">
+            <label className={label}>Fecha de nacimiento</label>
+            <input
+              type="date"
+              className={input}
+              value={form.birth_date}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
+            />
+            {form.birth_date && <p className="text-xs font-mono text-accent">{birthdayLabel(form.birth_date)}</p>}
           </div>
           <div className="space-y-1">
             <label className={label}>Ciudad</label>

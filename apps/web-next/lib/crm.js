@@ -209,6 +209,33 @@ export function dayStartIso(ymd) {
   return new Date(`${ymd}T00:00:00-05:00`).toISOString();
 }
 
+// Cumpleaños: { days, turns } hasta el próximo (0 = hoy). El 29/feb se celebra el 28 en años no bisiestos.
+export function birthdayInfo(birthDate) {
+  if (!birthDate) return null;
+  const [by, bm, bd] = birthDate.split("-").map(Number);
+  const today = todayYmd();
+  const [ty] = today.split("-").map(Number);
+  for (const y of [ty, ty + 1]) {
+    const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    const d = bm === 2 && bd === 29 && !leap ? 28 : bd;
+    const ymd = `${y}-${String(bm).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    if (ymd >= today) {
+      const days = Math.round((new Date(`${ymd}T12:00:00Z`) - new Date(`${today}T12:00:00Z`)) / 86400000);
+      return { days, turns: y - by, next: ymd };
+    }
+  }
+  return null;
+}
+
+export function birthdayLabel(birthDate) {
+  const b = birthdayInfo(birthDate);
+  if (!b) return "";
+  if (b.days === 0) return `🎂 ¡Hoy cumple ${b.turns}!`;
+  if (b.days === 1) return `🎂 Mañana cumple ${b.turns}`;
+  if (b.days <= 30) return `🎂 Cumple ${b.turns} en ${b.days} días`;
+  return `${b.turns - 1} años`;
+}
+
 export function waLink(phone) {
   return `https://wa.me/${String(phone || "").replace(/\D/g, "")}`;
 }

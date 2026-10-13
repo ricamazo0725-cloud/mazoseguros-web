@@ -15,6 +15,7 @@ const ALIASES = {
   telefono: ["telefono", "celular", "movil", "whatsapp", "phone", "tel", "numero celular"],
   email: ["email", "correo", "correo electronico", "e-mail", "mail"],
   ciudad: ["ciudad", "municipio", "city"],
+  fecha_nacimiento: ["fecha nacimiento", "fecha de nacimiento", "nacimiento", "cumpleanos", "cumple", "birth date", "birthday"],
   interes: ["interes", "seguro", "interest"],
   estado: ["estado", "status", "etapa", "estado poliza"],
   estado_cliente: ["estado cliente", "estado del cliente"],
@@ -130,9 +131,9 @@ function localCheck(r) {
 
 function downloadTemplate() {
   const csv =
-    "﻿nombre;tipo_documento;documento;telefono;email;ciudad;interes;estado;notas;carpeta_cliente\n" +
-    "Ana Pérez Gómez;CC;1020304050;3001234567;ana@correo.com;Medellín;auto;cliente;Renueva en marzo;Clientes/Ana Perez\n" +
-    "Constructora Ejemplo SAS;NIT;900123456;3109876543;;Bogotá;obras-civiles;cotizando;;\n";
+    "﻿nombre;tipo_documento;documento;telefono;email;ciudad;fecha_nacimiento;interes;estado;notas;carpeta_cliente\n" +
+    "Ana Pérez Gómez;CC;1020304050;3001234567;ana@correo.com;Medellín;15/03/1988;auto;cliente;Renueva en marzo;Clientes/Ana Perez\n" +
+    "Constructora Ejemplo SAS;NIT;900123456;3109876543;;Bogotá;;obras-civiles;cotizando;;\n";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   a.download = "plantilla-clientes.csv";
@@ -142,7 +143,7 @@ function downloadTemplate() {
 
 // ───────────── Nuevo cliente (formulario) ─────────────
 export function NewContactForm({ onCreated, onOpen, onCancel }) {
-  const empty = { nombre: "", tipo_documento: "CC", documento: "", telefono: "", email: "", ciudad: "", interes: "", estado: "nuevo", notas: "", carpeta_cliente: "" };
+  const empty = { nombre: "", tipo_documento: "CC", documento: "", telefono: "", email: "", ciudad: "", fecha_nacimiento: "", interes: "", estado: "nuevo", notas: "", carpeta_cliente: "" };
   const [f, setF] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null); // { type, text, contactId }
@@ -203,6 +204,10 @@ export function NewContactForm({ onCreated, onOpen, onCancel }) {
         <div className="space-y-1">
           <label className={label}>Ciudad</label>
           <input className={input} value={f.ciudad} onChange={set("ciudad")} />
+        </div>
+        <div className="space-y-1">
+          <label className={label}>Fecha de nacimiento</label>
+          <input className={input} type="date" value={f.fecha_nacimiento} onChange={set("fecha_nacimiento")} max={new Date().toISOString().slice(0, 10)} />
         </div>
         <div className="space-y-1">
           <label className={label}>Interés</label>
@@ -307,7 +312,7 @@ export function ContactImport({ onDone, onOpen, onCancel }) {
       <p className="text-sm text-muted">
         Sube un archivo <b>CSV</b> (de Excel: “Guardar como → CSV”) o pega abajo el contenido en CSV o JSON. La primera fila
         debe tener los encabezados. Columnas: <span className="font-mono text-xs">nombre, tipo_documento, documento, telefono,
-        email, ciudad, interes, estado, notas, carpeta_cliente</span>. Si la fila trae <b>aseguradora</b> también se guarda la
+        email, ciudad, fecha_nacimiento, interes, estado, notas, carpeta_cliente</span>. Si la fila trae <b>aseguradora</b> también se guarda la
         póliza (numero_poliza, ramo, producto, bien_asegurado, inicio_vigencia, fin_vigencia, prima, estado de la póliza).
         Si el cliente ya existe (mismo documento o teléfono) solo se completan los datos que le falten.
       </p>

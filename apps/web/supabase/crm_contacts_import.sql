@@ -3,7 +3,7 @@
 --
 -- crm_import_contacts(p_rows, p_mode)
 --   p_rows: arreglo JSON de objetos con estas llaves (todas texto, opcionales salvo nombre):
---     nombre, tipo_documento, documento, telefono, email, ciudad, interes, estado, notas, carpeta_cliente
+--     nombre, tipo_documento, documento, telefono, email, ciudad, fecha_nacimiento, interes, estado, notas, carpeta_cliente
 --   Si la fila trae "aseguradora" también se crea/actualiza la PÓLIZA del cliente con:
 --     aseguradora, numero_poliza, ramo, producto, bien_asegurado, fecha_expedicion, inicio_vigencia,
 --     fin_vigencia, prima, estado (de la póliza: vigente, renovada, cancelada, vencida, cotizacion),
@@ -13,6 +13,8 @@
 -- Empareja como la importación de pólizas: primero por documento, luego por teléfono.
 -- Devuelve una fila por registro: (fila, resultado, detalle, contact_id)
 --   resultado = creado | actualizado | existe | error
+
+alter table crm_contacts add column if not exists birth_date date;  -- ver crm_birthdays.sql
 
 create or replace function crm_norm_phone(p text) returns text language sql immutable as $$
   select case
@@ -57,7 +59,7 @@ declare
   v_contact uuid; v_other_doc text; v_other_name text; v_note text;
   v_by_doc uuid;
   v_has_policy boolean; v_notes text; v_pol_status text; v_line text; v_existing uuid; v_pol_txt text;
-  v_issue date; v_pstart date; v_pend date;
+  v_issue date; v_pstart date; v_pend date; v_birth date;
 begin
   if auth.role() <> 'authenticated' then raise exception 'no autorizado'; end if;
   if jsonb_typeof(p_rows) <> 'array' then raise exception 'se esperaba una lista de clientes'; end if;
@@ -72,6 +74,10 @@ begin
       v_doc := crm_norm_doc(r ->> 'documento');
       v_phone := crm_norm_phone(r ->> 'telefono');
       v_email := nullif(lower(btrim(r ->> 'email')), '');
+      v_birth := crm_parse_date(r ->> 'fecha_nacimiento');
+      if v_birth is not null and (v_birth > current_date or v_birth < date '1900-01-01') then
+        raise exception 'fecha de nacimiento inválida (%)', r ->> 'fecha_nacimiento';
+      end if;
       v_has_policy := nullif(btrim(r ->> 'aseguradora'), '') is not null;
       v_status := crm_parse_status(case when v_has_policy then r ->> 'estado_cliente' else r ->> 'estado' end);
       v_notes := nullif(btrim(case when v_has_policy then r ->> 'notas_cliente' else r ->> 'notas' end), '');
@@ -129,10 +135,10 @@ begin
       end if;
 
       if v_contact is null then
-        insert into crm_contacts (name, phone, email, doc_type, doc_number, city, interest, notes, onedrive_folder,
+        insert into crm_contacts (name, phone, email, doc_type, doc_number, city, birth_date, interest, notes, onedrive_folder,
                                   source, status, lead_source)
         values (v_name, v_phone, v_email, nullif(upper(btrim(r ->> 'tipo_documento')), ''), v_doc,
-                nullif(btrim(r ->> 'ciudad'), ''), v_interest, v_notes,
+                nullif(btrim(r ->> 'ciudad'), ''), v_birth, v_interest, v_notes,
                 nullif(btrim(r ->> 'carpeta_cliente'), ''), p_mode,
                 coalesce(v_status, case when p_mode = 'import' then 'cliente' else 'nuevo' end),
                 p_mode)
@@ -150,6 +156,7 @@ begin
           doc_type = coalesce(c.doc_type, nullif(upper(btrim(r ->> 'tipo_documento')), '')),
           doc_number = coalesce(c.doc_number, v_doc),
           city = coalesce(c.city, nullif(btrim(r ->> 'ciudad'), '')),
+          birth_date = coalesce(c.birth_date, v_birth),
           interest = coalesce(c.interest, v_interest),
           onedrive_folder = coalesce(nullif(btrim(r ->> 'carpeta_cliente'), ''), c.onedrive_folder),
           notes = case

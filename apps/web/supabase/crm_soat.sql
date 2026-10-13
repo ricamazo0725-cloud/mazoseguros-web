@@ -289,6 +289,7 @@ begin
       E'⛔ *vencidos* — vencidos sin renovar.\n' ||
       E'✏️ *fecha ABC123 31/12/2026* — corregir vencimiento.\n' ||
       E'📱 *tel ABC123 3001234567* — celular del cliente.\n' ||
+      E'🎂 *cumpleaños* — clientes que cumplen en los próximos 7 días.\n' ||
       E'🧪 *modo cliente* — probar el bot como cliente (2 h).',
       jsonb_build_array(
         jsonb_build_object('id', 'a_vencen', 'title', 'Vencen pronto'),
@@ -310,6 +311,10 @@ begin
         and not exists (select 1 from crm_soat n where n.plate = s2.plate and n.end_date > s2.end_date)
       order by s2.end_date limit 40) x;
     v_out := jsonb_build_array(crm_msg_text(crm_soat_list_text('📅 SOAT que vencen en los próximos ' || v_days || ' días:', v_rows)));
+
+  elsif v_in ~ '^(cumpleanos|cumple|a_cumple)( \d{1,2})?$' then
+    v_days := coalesce(nullif(regexp_replace(v_in, '\D', '', 'g'), '')::int, 7);
+    v_out := jsonb_build_array(crm_msg_text(crm_birthdays_text(v_days)));
 
   elsif v_in in ('vencidos', 'a_vencidos') then
     select array_agg(x.s order by (x.s).end_date) into v_rows from (
@@ -376,7 +381,7 @@ begin
 
   else
     v_out := jsonb_build_array(crm_msg_text(
-      'No entendí 🙏 Mándame la *foto del SOAT*, una *placa* (ABC123), una *cédula*, *vencen*, *vencidos* o *ayuda*.'));
+      'No entendí 🙏 Mándame la *foto del SOAT*, una *placa* (ABC123), una *cédula*, *vencen*, *vencidos*, *cumpleaños* o *ayuda*.'));
   end if;
 
   update crm_contacts set bot_state = null, bot_data = '{}'::jsonb, bot_updated_at = now(), unread_count = 0
