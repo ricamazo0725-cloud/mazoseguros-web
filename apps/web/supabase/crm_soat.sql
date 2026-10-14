@@ -314,7 +314,11 @@ begin
              'https://wa.me/' || v_phone || '?text=' || crm_urlencode(v_text)
         else '👆 Reenvíale el mensaje de arriba (no tengo el celular de ' || coalesce(v_name, 'este cliente') ||
              '; agrégalo con *tel ' || s.plate || ' 300…*).' end ||
-      E'\n\nCuando lo envíes escribe *enviado ' || s.plate || '* y lo marco como contactado.'));
+      E'\n\nCuando lo envíes escribe *enviado ' || s.plate || '* y lo marco como contactado.'))
+    -- Último mensaje: solo el celular del cliente, para copiarlo con un toque largo
+    || case when v_phone is not null
+         then jsonb_build_array(crm_msg_text(case when v_phone ~ '^57\d{10}$' then substr(v_phone, 3) else v_phone end))
+         else '[]'::jsonb end;
 end $$;
 
 -- Recordatorios pendientes para un asesor: vencen en 0–7 días o vencieron en los últimos 30,
