@@ -16,6 +16,7 @@ export default {
         muted: "hsl(var(--muted) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
         danger: "hsl(var(--danger) / <alpha-value>)",
+        whatsapp: { DEFAULT: "#25D366", hover: "#1D9E4C" },
       },
       fontFamily: {
         display: ["var(--font-display)", "serif"],

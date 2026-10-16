@@ -37,7 +37,7 @@ export default function PushToggle({ email }) {
     }
   }
 
-  const base = "text-xs font-mono border rounded px-3 py-1.5";
+  const base = "w-full flex items-center justify-between gap-2 text-sm font-medium border rounded-lg px-3 py-2 transition-colors";
   if (state === "loading") return null;
   if (state === "unsupported") return null;
   if (state === "ios-install") {
@@ -48,13 +48,15 @@ export default function PushToggle({ email }) {
     );
   }
   return (
-    <span className="flex items-center gap-2">
-      {msg && <span className="hidden sm:inline text-[11px] font-mono text-primary-foreground/80">{msg}</span>}
+    <span className="flex flex-col gap-1 w-full">
+      {msg && <span className="hidden sm:inline text-[11px] text-slate-400">{msg}</span>}
       <button
         onClick={toggle}
         disabled={busy}
         className={`${base} ${
-          state === "on" ? "border-accent bg-accent text-accent-foreground" : "border-primary-foreground/30 hover:border-primary-foreground"
+          state === "on"
+            ? "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20"
+            : "border-slate-500/40 text-slate-400 hover:text-amber-500 hover:border-amber-500/40"
         }`}
         title={state === "on" ? "Desactivar avisos en este dispositivo" : "Recibir avisos en este dispositivo"}
       >

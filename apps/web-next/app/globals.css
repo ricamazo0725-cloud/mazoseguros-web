@@ -158,3 +158,52 @@ body {
 .thin-scroll::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
 @keyframes admin-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .admin-rise { animation: admin-rise 0.35s cubic-bezier(.2,.7,.2,1) both; }
+
+/* ───────── Tema del panel admin (slate + naranja, tipografía Inter) ─────────
+   Se aplica con la clase .admin-theme en la raíz del /admin: redefine los tokens,
+   así todos los paneles toman el mismo estilo sin tocar cada componente. */
+.admin-theme {
+  --background: 210 40% 98%;   /* #F8FAFC */
+  --surface: 0 0% 100%;
+  --surface-2: 210 40% 96%;    /* slate-100 */
+  --ink: 222 47% 11%;          /* slate-900 */
+  --foreground: 217 33% 17%;   /* slate-800 */
+  --muted: 215 16% 47%;        /* slate-500 */
+  --primary: 222 47% 11%;      /* #0F172A */
+  --primary-foreground: 210 40% 98%;
+  --accent: 21 90% 48%;        /* #EA580C */
+  --accent-foreground: 0 0% 100%;
+  --border: 214 32% 91%;       /* slate-200 */
+  --danger: 0 72% 51%;
+  --radius: 8px;
+  --font-display: "Inter", sans-serif;
+  --font-mono: "Inter", sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.admin-theme .font-mono { font-variant-numeric: tabular-nums; }
+.admin-theme .doc-card {
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+.admin-theme .btn-cta {
+  font-weight: 500;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+.admin-theme .btn-cta:hover { filter: none; background: #c2410c; }
+.admin-theme input, .admin-theme select, .admin-theme textarea { border-radius: 8px; }
+.admin-theme input:focus, .admin-theme select:focus, .admin-theme textarea:focus {
+  outline: none;
+  border-color: hsl(var(--accent));
+  box-shadow: 0 0 0 3px hsl(var(--accent) / 0.15);
+}
+.admin-theme .chat-bg {
+  background-color: #efeae2;
+  background-image: radial-gradient(rgb(15 23 42 / 0.05) 1px, transparent 1px);
+}
+.admin-theme ::-webkit-scrollbar { width: 6px; height: 6px; }
+.admin-theme ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.admin-theme ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }

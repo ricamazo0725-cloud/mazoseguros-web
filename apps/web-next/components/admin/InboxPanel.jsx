@@ -67,16 +67,16 @@ export default function InboxPanel({ initialContactId, onSchedule }) {
   return (
     <div className="h-full grid md:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)_auto] min-h-0 bg-surface">
       {/* ── Lista de conversaciones ── */}
-      <aside className={`min-h-0 flex flex-col border-r border-border bg-background ${selectedId ? "hidden md:flex" : "flex"}`}>
+      <aside className={`min-h-0 flex flex-col border-r border-border bg-surface shadow-sm ${selectedId ? "hidden md:flex" : "flex"}`}>
         <div className="px-4 pt-4 pb-3 space-y-3 border-b border-border">
           <div className="flex items-baseline justify-between">
-            <h2 className="font-display text-xl font-semibold">Conversaciones</h2>
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Conversaciones</h2>
             {unreadTotal > 0 && (
               <span className="text-[11px] font-mono bg-accent text-accent-foreground rounded-full px-2 py-0.5">{unreadTotal} sin leer</span>
             )}
           </div>
           <input
-            className="w-full bg-surface border border-border rounded-full px-4 py-2 text-sm focus-ring"
+            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm"
             placeholder="Buscar nombre, celular o placa"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -86,8 +86,8 @@ export default function InboxPanel({ initialContactId, onSchedule }) {
               <button
                 key={k}
                 onClick={() => setFilter(k)}
-                className={`shrink-0 text-[11px] font-mono px-3 py-1 rounded-full border transition ${
-                  filter === k ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted hover:text-foreground"
+                className={`shrink-0 text-xs font-medium px-3 py-1 rounded-full border transition ${
+                  filter === k ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 {v}
@@ -96,7 +96,7 @@ export default function InboxPanel({ initialContactId, onSchedule }) {
           </div>
         </div>
         {error && <p className="text-xs text-danger font-mono px-4 pt-2">{error}</p>}
-        <ul className="flex-1 min-h-0 overflow-y-auto thin-scroll p-2 space-y-1.5">
+        <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100">
           {rows.length === 0 && !error && <li className="text-sm text-muted font-mono p-6 text-center">No hay conversaciones.</li>}
           {rows.map((c) => (
             <li key={c.id}>

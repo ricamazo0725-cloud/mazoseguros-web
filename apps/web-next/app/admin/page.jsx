@@ -100,60 +100,108 @@ function Dashboard() {
     return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
   }, []);
 
-  const fullBleed = tab === "Conversaciones";
-  const NavButton = ({ n }) => (
-    <button
-      onClick={() => setTab(n.key)}
-      title={n.key}
-      className={`group relative shrink-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition focus-ring ${
-        tab === n.key ? "bg-primary-foreground/10 text-primary-foreground" : "text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/5"
-      }`}
-    >
-      {tab === n.key && <span className="hidden md:block absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-accent" />}
-      <NavIcon d={n.icon} />
-      <span className="md:hidden lg:inline whitespace-nowrap">{n.key}</span>
-      {n.key === "Conversaciones" && unread > 0 && (
-        <span className="lg:ml-auto md:absolute md:top-1 md:right-1 lg:static text-[10px] font-mono bg-accent text-accent-foreground rounded-full px-1.5 min-w-[18px] text-center">
-          {unread}
+  const fullBleed = tab === "Conversaciones" || tab === "Clientes";
+  // Menú lateral plegable (se recuerda en este navegador)
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("admin-nav-collapsed") === "1");
+    } catch {}
+  }, []);
+  const toggleNav = () =>
+    setCollapsed((v) => {
+      try {
+        localStorage.setItem("admin-nav-collapsed", v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+  const wide = !collapsed; // en md+ muestra textos solo si no está plegado
+  const NavButton = ({ n }) => {
+    const active = tab === n.key;
+    return (
+      <button
+        onClick={() => setTab(n.key)}
+        title={n.key}
+        className={`group relative shrink-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors focus-ring border-l-4 ${
+          active ? "bg-slate-800 text-white font-medium border-accent" : "border-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+        }`}
+      >
+        <span className={`transition-transform group-hover:scale-110 ${active ? "text-accent" : ""}`}>
+          <NavIcon d={n.icon} />
         </span>
-      )}
-    </button>
-  );
+        <span className={`whitespace-nowrap ${wide ? "md:inline" : "md:hidden"}`}>{n.key}</span>
+        {n.key === "Conversaciones" && unread > 0 && (
+          <span
+            className={`text-[10px] font-semibold bg-accent text-white rounded-full px-1.5 min-w-[18px] text-center ${
+              wide ? "ml-auto" : "md:absolute md:top-1 md:right-1"
+            }`}
+          >
+            {unread}
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
-    <div className="h-[100dvh] flex flex-col md:flex-row bg-background">
+    <div className="admin-theme h-[100dvh] flex flex-col md:flex-row">
       {/* ── Menú lateral ── */}
-      <nav className="shrink-0 bg-primary text-primary-foreground md:w-[72px] lg:w-60 flex md:flex-col pt-[env(safe-area-inset-top)] md:pt-0">
-        <div className="hidden md:flex items-center gap-2 h-16 px-4 lg:px-5 border-b border-primary-foreground/10">
-          <span className="w-8 h-8 rounded-md bg-accent grid place-items-center font-display font-semibold">M</span>
-          <span className="hidden lg:block leading-tight">
-            <span className="block font-display font-semibold">Mazoseguros</span>
-            <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-primary-foreground/50">Admin</span>
-          </span>
+      <nav
+        className={`shrink-0 bg-[#0F172A] text-slate-300 flex md:flex-col pt-[env(safe-area-inset-top)] md:pt-0 transition-[width] duration-300 ${
+          wide ? "md:w-64" : "md:w-[76px]"
+        }`}
+      >
+        <div className="hidden md:flex items-center justify-between gap-2 h-16 px-4 border-b border-slate-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-9 h-9 shrink-0 rounded-lg bg-accent grid place-items-center text-white font-bold text-lg shadow-md">M</span>
+            {wide && (
+              <span className="leading-tight whitespace-nowrap">
+                <span className="block font-bold text-white text-sm tracking-wide">MazoSeguros</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-widest text-slate-400">Admin panel</span>
+              </span>
+            )}
+          </div>
+          <button
+            onClick={toggleNav}
+            title={wide ? "Plegar menú" : "Desplegar menú"}
+            className="text-slate-400 hover:text-white p-1.5 rounded-md hover:bg-slate-800 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className={`w-4 h-4 transition-transform ${wide ? "" : "rotate-180"}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
+            </svg>
+          </button>
         </div>
         <div className="flex md:flex-col gap-1 p-2 md:p-3 overflow-x-auto no-scrollbar md:overflow-y-auto md:flex-1">
+          {wide && <p className="hidden md:block px-3 mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Operación</p>}
           {NAV.filter((n) => n.group === "crm").map((n) => (
             <NavButton key={n.key} n={n} />
           ))}
-          <p className="hidden lg:block mt-4 mb-1 px-3 text-[10px] font-mono uppercase tracking-[0.2em] text-primary-foreground/40">Sitio web</p>
-          <span className="hidden md:block lg:hidden my-2 border-t border-primary-foreground/10" />
+          {wide ? (
+            <p className="hidden md:block mt-5 mb-1 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Sitio web</p>
+          ) : (
+            <span className="hidden md:block my-3 border-t border-slate-800" />
+          )}
           {NAV.filter((n) => n.group === "site").map((n) => (
             <NavButton key={n.key} n={n} />
           ))}
         </div>
-        <div className="hidden md:flex md:flex-col gap-2 p-3 border-t border-primary-foreground/10">
-          <PushToggle email={session?.user?.email} />
+        <div className="hidden md:flex md:flex-col gap-2 p-3 border-t border-slate-800 bg-slate-900/50">
+          {wide && <PushToggle email={session?.user?.email} />}
           <button
             onClick={signOut}
-            className="text-xs font-mono border border-primary-foreground/30 rounded px-3 py-1.5 hover:border-primary-foreground"
+            title="Cerrar sesión"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors text-sm font-medium"
           >
-            Salir
+            <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11" />
+            </svg>
+            {wide && <span>Cerrar sesión</span>}
           </button>
         </div>
       </nav>
 
       {/* ── Contenido ── */}
-      <main className={`flex-1 min-h-0 min-w-0 ${fullBleed ? "overflow-hidden" : "overflow-y-auto thin-scroll"}`}>
+      <main className={`flex-1 min-h-0 min-w-0 bg-background ${fullBleed ? "overflow-hidden" : "overflow-y-auto thin-scroll"}`}>
         {tab === "Conversaciones" && (
           <InboxPanel
             initialContactId={openContactId}
@@ -173,6 +221,16 @@ function Dashboard() {
             }}
           />
         )}
+        {tab === "Clientes" && (
+          <CrmPanel
+            initialContactId={openContactId}
+            initialFilters={clientFilters}
+            onSchedule={(contact) => {
+              setSchedulePreset(contact);
+              setTab("Agenda");
+            }}
+          />
+        )}
         {!fullBleed && tab !== "Tablero" && (
           <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="md:hidden flex justify-end gap-2 mb-4">
@@ -181,16 +239,6 @@ function Dashboard() {
                 Salir
               </button>
             </div>
-            {tab === "Clientes" && (
-              <CrmPanel
-                initialContactId={openContactId}
-                initialFilters={clientFilters}
-                onSchedule={(contact) => {
-                  setSchedulePreset(contact);
-                  setTab("Agenda");
-                }}
-              />
-            )}
             {tab === "Pólizas" && <PoliciesPanel onOpenContact={openClient} />}
             {tab === "SOAT" && <SoatPanel onOpenContact={openClient} />}
             {tab === "Agenda" && <AgendaPanel preset={schedulePreset} onPresetUsed={clearPreset} />}

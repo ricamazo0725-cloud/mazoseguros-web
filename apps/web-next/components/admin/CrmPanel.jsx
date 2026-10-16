@@ -30,8 +30,8 @@ import {
   waLink,
 } from "@/lib/crm";
 
-const input = "w-full bg-background border border-border rounded px-3 py-2 text-sm focus-ring";
-const label = "text-xs font-mono uppercase tracking-wider text-muted";
+const input = "w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 shadow-sm transition-all";
+const label = "block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5";
 
 export const INSURERS = [
   "SURA", "AXA Colpatria", "Seguros Mundial", "HDI (Liberty)", "La Previsora", "Seguros del Estado", "Seguros Bolívar",
@@ -107,171 +107,212 @@ export default function CrmPanel({ onSchedule, initialContactId, initialFilters 
   };
   const showRight = selectedId || mode;
 
+  const chip = (on, tone) =>
+    `shrink-0 px-2.5 py-1 rounded-full border text-xs font-medium whitespace-nowrap transition-colors ${
+      on
+        ? tone === "red"
+          ? "bg-red-600 border-red-600 text-white"
+          : tone === "amber"
+          ? "bg-amber-500 border-amber-500 text-white"
+          : "bg-slate-800 border-slate-800 text-white"
+        : tone === "red"
+        ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+        : tone === "amber"
+        ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+        : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+    }`;
+
   return (
-    <div className="grid gap-6 md:grid-cols-[360px_1fr]">
-      <aside className={`space-y-3 ${showRight ? "hidden md:block" : ""}`}>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode("new")}
-            className={`flex-1 text-xs font-mono px-3 py-2 rounded border ${mode === "new" ? "border-accent text-accent" : "border-border hover:border-accent"}`}
-          >
-            + Nuevo cliente
-          </button>
-          <button
-            onClick={() => setMode("import")}
-            className={`flex-1 text-xs font-mono px-3 py-2 rounded border ${mode === "import" ? "border-accent text-accent" : "border-border hover:border-accent"}`}
-          >
-            📂 Importar
-          </button>
-        </div>
-        {/* Segmentos */}
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-surface-2 border border-border">
-          {Object.entries(SEGMENTS).map(([k, v]) => (
+    <div className="h-full flex min-h-0">
+      {/* ── Columna de clientes ── */}
+      <aside
+        className={`w-full md:w-[380px] lg:w-[420px] shrink-0 bg-surface border-r border-border flex-col min-h-0 shadow-sm ${
+          showRight ? "hidden md:flex" : "flex"
+        }`}
+      >
+        <div className="p-4 border-b border-slate-100 space-y-3">
+          <div className="flex gap-2">
             <button
-              key={k || "all"}
-              onClick={() => setSegment(k)}
-              className={`rounded-md px-1 py-1.5 text-[11px] font-mono leading-tight transition ${
-                segment === k ? "bg-background shadow-sm text-accent font-semibold" : "text-muted hover:text-foreground"
+              onClick={() => setMode("new")}
+              className="flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-[#C2410C] text-white px-3 py-2 rounded-lg font-medium text-sm shadow-sm transition-colors"
+            >
+              <span className="text-base leading-none">+</span> Nuevo cliente
+            </button>
+            <button
+              onClick={() => setMode("import")}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm border transition-colors ${
+                mode === "import" ? "border-accent text-accent bg-accent/5" : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
               }`}
             >
-              {v}
-              {counts?.[k] != null && <span className="block text-[10px] opacity-70">{counts[k]}</span>}
+              📂 Importar
             </button>
-          ))}
-        </div>
-
-        <div className="flex gap-2">
-          <input
-            className={input}
-            placeholder="Buscar nombre, celular, cédula o placa"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className={`shrink-0 text-xs font-mono px-3 rounded border ${showFilters || activeFilters ? "border-accent text-accent" : "border-border text-muted"}`}
-            title="Filtros y orden"
-          >
-            ⚙︎{activeFilters ? ` ${activeFilters}` : ""}
-          </button>
-        </div>
-
-        <select
-          className={`${input} ${advisor ? "border-accent text-accent" : ""}`}
-          value={advisor}
-          onChange={(e) => setAdvisor(e.target.value)}
-        >
-          <option value="">👤 Todos los asesores</option>
-          <option value="__none">Sin asesor asignado</option>
-          {advisorNames.map((n) => (
-            <option key={n} value={n}>
-              👤 {n}
-            </option>
-          ))}
-        </select>
-
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            ["", "Todo"],
-            ["vencido", "⛔ Vencidos"],
-            ["d30", "⏳ ≤ 30 días"],
-            ["d60", "📅 ≤ 60 días"],
-          ].map(([k, v]) => (
-            <button
-              key={k || "all"}
-              onClick={() => setDue(k)}
-              className={`text-[11px] font-mono px-2.5 py-1 rounded-full border transition ${
-                due === k
-                  ? k === "vencido"
-                    ? "border-danger bg-danger/10 text-danger"
-                    : "border-accent bg-accent/10 text-accent"
-                  : "border-border text-muted hover:text-foreground"
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-          <select
-            value={insurer}
-            onChange={(e) => setInsurer(e.target.value)}
-            className={`text-[11px] font-mono px-2 py-1 rounded-full border bg-background ${insurer ? "border-accent text-accent" : "border-border text-muted"}`}
-          >
-            <option value="">🏢 Aseguradora</option>
-            {INSURERS.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {showFilters && (
-          <div className="space-y-2 doc-card p-3">
-            <select className={input} value={sort} onChange={(e) => setSort(e.target.value)}>
-              {Object.entries(SORTS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  Orden: {v}
-                </option>
-              ))}
-            </select>
-            <select className={input} value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">Todos los estados</option>
-              {Object.entries(CONTACT_STATUS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-            <select className={input} value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="">Todos los orígenes</option>
-              {Object.entries(LEAD_SOURCE).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-            {activeFilters > 0 && (
-              <button
-                onClick={() => {
-                  setStatus("");
-                  setSource("");
-                  setSort("recientes");
-                }}
-                className="text-xs font-mono text-muted hover:text-accent"
-              >
-                Limpiar filtros
-              </button>
-            )}
           </div>
-        )}
+          {/* Segmentos */}
+          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-medium text-slate-600">
+            {Object.entries(SEGMENTS).map(([k, v]) => (
+              <button
+                key={k || "all"}
+                onClick={() => setSegment(k)}
+                className={`flex-1 py-1.5 px-1 rounded-lg text-center transition-all ${
+                  segment === k ? "bg-white text-accent shadow-sm font-semibold" : "hover:text-slate-900"
+                }`}
+              >
+                {v}{" "}
+                {counts?.[k] != null && (
+                  <span
+                    className={`text-[10px] ${segment === k ? "bg-accent/10 text-accent px-1.5 py-0.5 rounded-full" : "text-slate-400"}`}
+                  >
+                    {counts[k]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+          <div className="relative">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
+            <input
+              className="w-full pl-9 pr-10 py-2 bg-white border border-slate-200 text-sm text-slate-700 placeholder-slate-400 transition-all"
+              placeholder="Buscar nombre, celular, cédula o placa…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              title="Filtros y orden"
+              className={`absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-xs ${
+                showFilters || activeFilters ? "text-accent bg-accent/10" : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4 inline" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+                <circle cx="16" cy="6" r="2" />
+                <circle cx="10" cy="12" r="2" />
+                <circle cx="18" cy="18" r="2" />
+              </svg>
+              {activeFilters ? ` ${activeFilters}` : ""}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+            <button onClick={() => setDue("")} className={chip(due === "")}>
+              Todo
+            </button>
+            <button onClick={() => setDue("vencido")} className={`${chip(due === "vencido", "red")} flex items-center gap-1`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${due === "vencido" ? "bg-white" : "bg-red-500"}`} /> Vencidos
+            </button>
+            <button onClick={() => setDue("d30")} className={chip(due === "d30", "amber")}>
+              ≤ 30 días
+            </button>
+            <button onClick={() => setDue("d60")} className={chip(due === "d60")}>
+              ≤ 60 días
+            </button>
+            <select
+              value={insurer}
+              onChange={(e) => setInsurer(e.target.value)}
+              className={`shrink-0 text-xs font-medium px-2.5 py-1 !rounded-full border ${
+                insurer ? "bg-slate-800 border-slate-800 text-white" : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              <option value="">Aseguradora ▾</option>
+              {INSURERS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <select
+              value={advisor}
+              onChange={(e) => setAdvisor(e.target.value)}
+              className={`shrink-0 text-xs font-medium px-2.5 py-1 !rounded-full border ${
+                advisor ? "bg-slate-800 border-slate-800 text-white" : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              <option value="">Asesor ▾</option>
+              <option value="__none">Sin asesor</option>
+              {advisorNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {showFilters && (
+            <div className="grid gap-2 bg-white border border-slate-200 rounded-lg p-3">
+              <select className={input} value={sort} onChange={(e) => setSort(e.target.value)}>
+                {Object.entries(SORTS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    Orden: {v}
+                  </option>
+                ))}
+              </select>
+              <select className={input} value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="">Todos los estados</option>
+                {Object.entries(CONTACT_STATUS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <select className={input} value={source} onChange={(e) => setSource(e.target.value)}>
+                <option value="">Todos los orígenes</option>
+                {Object.entries(LEAD_SOURCE).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              {activeFilters > 0 && (
+                <button
+                  onClick={() => {
+                    setStatus("");
+                    setSource("");
+                    setSort("recientes");
+                  }}
+                  className="text-xs text-slate-500 hover:text-accent text-left"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         <datalist id="crm-advisor-names">
           {advisorNames.map((n) => (
             <option key={n} value={n} />
           ))}
         </datalist>
 
-        <div className="flex items-center justify-between text-[11px] font-mono text-muted px-1">
-          <span>
+        <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-500 flex justify-between items-center gap-2">
+          <span className="truncate">
             {total} {total === 1 ? "contacto" : "contactos"}
             {segment ? ` · ${SEGMENTS[segment]}` : ""}
             {advisor ? ` · ${advisor === "__none" ? "sin asesor" : advisor}` : ""}
             {insurer ? ` · ${insurer}` : ""}
             {due === "vencido" ? " · vencidos" : due ? ` · vence ≤ ${due.slice(1)} d` : ""}
           </span>
-          {total > contacts.length && <span>mostrando {contacts.length}</span>}
+          <span className="shrink-0 text-slate-400">
+            {total > contacts.length ? `mostrando ${contacts.length}` : SORTS[sort]}
+          </span>
         </div>
-        {error && <p className="text-xs text-danger font-mono">{error}</p>}
-        <ul className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
+        {error && <p className="text-xs text-danger px-4 pt-2">{error}</p>}
+        <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100">
           {contacts.length === 0 && !error && (
-            <li className="text-sm text-muted font-mono p-4 text-center">
-              {search || activeFilters || segment ? "Nada coincide con la búsqueda." : "Sin contactos todavía."}
+            <li className="text-sm text-slate-400 p-8 text-center">
+              {search || activeFilters || segment || due || insurer || advisor ? "Nada coincide con la búsqueda." : "Sin contactos todavía."}
             </li>
           )}
           {contacts.map((c) => (
             <li key={c.id}>
               <ContactRow
                 c={c}
-                active={c.id === selectedId}
+                active={c.id === selectedId && !mode}
                 onClick={() => {
                   setMode(null);
                   setSelectedId(c.id);
@@ -282,26 +323,26 @@ export default function CrmPanel({ onSchedule, initialContactId, initialFilters 
         </ul>
       </aside>
 
-      <section className={showRight ? "" : "hidden md:block"}>
-        {showRight && (
-          <button
-            onClick={() => {
-              setMode(null);
-              setSelectedId(null);
-            }}
-            className="md:hidden mb-3 text-xs font-mono text-muted hover:text-accent"
-          >
-            ← Contactos
-          </button>
-        )}
-        {mode === "new" ? (
-          <NewContactForm onCreated={open} onOpen={open} onCancel={() => setMode(null)} />
-        ) : mode === "import" ? (
-          <ContactImport onDone={refresh} onOpen={open} onCancel={() => setMode(null)} />
+      {/* ── Ficha del cliente ── */}
+      <section className={`flex-1 min-w-0 min-h-0 flex-col ${showRight ? "flex" : "hidden md:flex"}`}>
+        {mode === "new" || mode === "import" ? (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+            <button onClick={() => setMode(null)} className="md:hidden mb-3 text-sm text-slate-500 hover:text-accent">
+              ← Clientes
+            </button>
+            <div className="max-w-5xl">
+              {mode === "new" ? (
+                <NewContactForm onCreated={open} onOpen={open} onCancel={() => setMode(null)} />
+              ) : (
+                <ContactImport onDone={refresh} onOpen={open} onCancel={() => setMode(null)} />
+              )}
+            </div>
+          </div>
         ) : selected ? (
-          <ContactDetail
+          <ClientDetail
             key={selected.id}
             contact={selected}
+            onBack={() => setSelectedId(null)}
             onSaved={refresh}
             onSchedule={onSchedule}
             onDeleted={() => {
@@ -311,8 +352,12 @@ export default function CrmPanel({ onSchedule, initialContactId, initialFilters 
             }}
           />
         ) : (
-          <div className="doc-card p-10 text-center text-muted text-sm">
-            Elige un contacto para ver su ficha y la conversación.
+          <div className="flex-1 grid place-items-center p-8">
+            <div className="text-center space-y-2">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-slate-100 grid place-items-center text-2xl">👤</div>
+              <p className="font-semibold text-slate-700">Elige un cliente</p>
+              <p className="text-sm text-slate-400">Verás su información, vehículos y SOAT, pólizas y conversación.</p>
+            </div>
           </div>
         )}
       </section>
@@ -332,70 +377,100 @@ function initials(n) {
   return ((w[0]?.[0] || "?") + (w[1]?.[0] || "")).toUpperCase();
 }
 
-function dueChip(c) {
-  if (c.next_date == null || c.next_days == null) return null;
-  const d = c.next_days;
-  const when = d < 0 ? `venció hace ${-d} d` : d === 0 ? "vence hoy" : `vence en ${d} d`;
-  const cls = d < 0 ? "text-danger border-danger/40" : d <= 30 ? "text-accent border-accent/40" : "text-muted border-border";
-  return <span className={`text-[10px] font-mono border rounded px-1.5 py-0.5 ${cls}`}>{KIND[c.next_kind] || ""} {when}</span>;
+function relTime(iso) {
+  if (!iso) return "";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
+  if (days <= 0) return "Hoy";
+  if (days === 1) return "Ayer";
+  if (days < 7) return `${days} días`;
+  if (days < 30) return `${Math.floor(days / 7)} sem`;
+  return new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 }
 
-export function ContactRow({ c, active, onClick, compact = false }) {
+function dueChip(c) {
+  if (c.next_date == null || c.next_days == null) {
+    return null;
+  }
+  const d = c.next_days;
+  const when = d < 0 ? `venció hace ${-d} d` : d === 0 ? "vence hoy" : `vence en ${d} d`;
+  const cls =
+    d < 0
+      ? "bg-red-50 text-red-700 border-red-200"
+      : d <= 30
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : d <= 60
+      ? "bg-slate-100 text-slate-600 border-slate-200"
+      : "bg-emerald-50 text-emerald-700 border-emerald-200";
+  return (
+    <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${cls}`}>
+      {d < 0 ? "⚠ " : "⏱ "}
+      {KIND[c.next_kind] || ""} {when}
+    </span>
+  );
+}
+
+const SEG_TAG = {
+  cliente: "bg-orange-50 text-accent border-orange-200",
+  solo_soat: "bg-slate-100 text-slate-600 border-slate-200",
+  prospecto: "bg-sky-50 text-sky-700 border-sky-200",
+};
+
+export function ContactRow({ c, active, onClick }) {
   const name = c.name || c.wa_name || (c.phone ? `+${c.phone}` : "Sin nombre");
   const seg = SEGMENT_CHIP[c.segment];
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left doc-card p-3 focus-ring flex gap-3 items-start transition ${active ? "border-accent ring-1 ring-accent/40" : "hover:border-accent/50"}`}
+      className={`w-full text-left p-4 flex items-start gap-3 border-l-4 transition-all focus-ring ${
+        active ? "border-accent bg-orange-50/40" : "border-transparent hover:bg-slate-50"
+      }`}
     >
-      <span
-        className={`shrink-0 w-9 h-9 rounded-full grid place-items-center text-xs font-semibold ${
-          c.segment === "solo_soat" ? "bg-primary/15 text-primary" : c.segment === "cliente" ? "bg-accent/15 text-accent" : "bg-surface-2 text-muted"
-        }`}
-      >
+      <span className="shrink-0 w-10 h-10 rounded-full grid place-items-center bg-slate-200 text-slate-700 text-xs font-bold">
         {initials(name)}
       </span>
-      <span className="min-w-0 flex-1 space-y-1">
+      <span className="min-w-0 flex-1">
         <span className="flex items-center justify-between gap-2">
-          <span className="font-display font-semibold truncate">{name}</span>
-          <span className="flex items-center gap-1 shrink-0">
+          <span className={`text-sm font-semibold truncate ${active ? "text-slate-900" : "text-slate-800"}`}>{name}</span>
+          <span className="flex items-center gap-1.5 shrink-0 text-[11px] text-slate-400">
             {birthdayInfo(c.birth_date)?.days === 0 && <span title="Cumple hoy">🎂</span>}
             {c.bot_state === "asesor" && <span title="Atendido por asesor">🙋</span>}
-            {c.unread_count > 0 && (
-              <span className="text-[10px] font-mono bg-accent text-accent-foreground rounded-full px-2 py-0.5">{c.unread_count}</span>
+            {c.unread_count > 0 ? (
+              <span className="text-[10px] font-semibold bg-accent text-white rounded-full px-2 py-0.5">{c.unread_count}</span>
+            ) : (
+              relTime(c.last_message_at || c.created_at)
             )}
           </span>
         </span>
-        <span className="block text-xs font-mono text-muted truncate">
-          {c.phone ? `+${c.phone}` : c.doc_number || "sin teléfono"}
-          {c.advisor && <> · 👤 {c.advisor}</>}
+        <span className="block text-xs text-slate-500 mt-0.5 truncate">
+          {c.phone ? `📞 +${c.phone}` : c.doc_number || "sin teléfono"}
+          {c.advisor && <span className="text-slate-400"> · 👤 {c.advisor}</span>}
         </span>
-        <span className="flex flex-wrap items-center gap-1">
-          {seg && <span className={`text-[10px] font-mono border rounded px-1.5 py-0.5 ${seg.cls}`}>{seg.label}</span>}
-          {c.segment === "solo_soat" && c.soat_plates && (
-            <span className="text-[10px] font-mono border border-border rounded px-1.5 py-0.5 tracking-wider">🚗 {c.soat_plates}</span>
+        <span className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {seg ? (
+            <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${SEG_TAG[c.segment]}`}>{seg.label}</span>
+          ) : (
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium border bg-slate-100 text-slate-600 border-slate-200">
+              {CONTACT_STATUS[c.status] || c.status}
+            </span>
+          )}
+          {c.soat_plates && (
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono font-medium border bg-slate-100 text-slate-700 border-slate-200 tracking-wide">
+              🚗 {c.soat_plates}
+            </span>
           )}
           {c.policies_count > 0 && (
-            <span className="text-[10px] font-mono border border-border rounded px-1.5 py-0.5">
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium border bg-white text-slate-600 border-slate-200">
               {c.policies_count} {c.policies_count === 1 ? "póliza" : "pólizas"}
-              {c.soat_count > 0 ? ` · ${c.soat_count} SOAT` : ""}
             </span>
           )}
           {dueChip(c)}
-          {!seg && <span className="text-[10px] font-mono text-muted">{CONTACT_STATUS[c.status] || c.status}</span>}
         </span>
-        {c.last_message_at && (
-          <span className="block text-[10px] text-muted">
-            💬 {fmtDateTime(c.last_message_at)}
-            {LEAD_SOURCE[c.lead_source] ? ` · ${LEAD_SOURCE[c.lead_source]}` : ""}
-          </span>
-        )}
       </span>
     </button>
   );
 }
 
-export function ClientSheet({ contact, onSaved, onSchedule, onDeleted, compact = false }) {
+function ClientForm({ contact, onSaved, onDeleted, compact = false }) {
   const [form, setForm] = useState({
     name: contact.name || "",
     email: contact.email || "",
@@ -471,37 +546,8 @@ export function ClientSheet({ contact, onSaved, onSchedule, onDeleted, compact =
   }
 
   return (
-    <div className="space-y-6">
-      <div className={`doc-card ${compact ? "p-4" : "p-6"} space-y-4`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display font-semibold text-lg">{contact.name || contact.wa_name || "Sin nombre"}</h2>
-            <p className="text-xs font-mono text-muted">
-              {contact.phone ? `+${contact.phone}` : "sin teléfono"}
-              {contact.doc_number && ` · ${contact.doc_type || "Doc"} ${contact.doc_number}`} · origen: {contact.source}
-              {contact.wa_name && contact.wa_name !== contact.name ? ` · WhatsApp: ${contact.wa_name}` : ""}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {contact.phone && (
-            <a
-              href={waLink(contact.phone)}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-mono border border-border rounded px-3 py-2 hover:border-accent"
-            >
-              Abrir WhatsApp
-            </a>
-            )}
-            <button onClick={() => onSchedule(contact)} className="btn-cta text-xs py-2 px-4">
-              Agendar asesoría
-            </button>
-          </div>
-        </div>
-
-        <LeadHistory contactId={contact.id} />
-
-        <div className={`grid gap-4 ${compact ? "" : "sm:grid-cols-2"}`}>
+    <div className="space-y-5">
+        <div className={`grid gap-5 ${compact ? "" : "md:grid-cols-2"}`}>
           <div className="space-y-1">
             <label className={label}>Nombre</label>
             <input className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -613,34 +659,251 @@ export function ClientSheet({ contact, onSaved, onSchedule, onDeleted, compact =
           />
         </div>
         {contact.notify_opt_out !== undefined && (
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
             <input
               type="checkbox"
+              className="accent-[#EA580C] w-4 h-4"
               checked={!form.notify_opt_out}
               onChange={(e) => setForm({ ...form, notify_opt_out: !e.target.checked })}
             />
             Enviarle recordatorios automáticos de vencimiento (SOAT y tecnomecánica) por WhatsApp y correo
           </label>
         )}
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={save} disabled={busy} className="btn-cta text-xs py-2 px-4">
-            {busy ? "Guardando…" : "Guardar cambios"}
-          </button>
-          {saved && <span className="text-xs text-accent font-mono">Guardado ✓</span>}
-          {saveError && <span className="text-xs text-danger font-mono">{saveError}</span>}
+        <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
           <button
             onClick={remove}
             disabled={busy}
-            className="ml-auto text-xs font-mono px-3 py-2 rounded border border-border text-muted hover:border-danger hover:text-danger"
+            className="text-sm px-3 py-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
             🗑 Eliminar cliente
           </button>
+          <span className="ml-auto flex flex-wrap items-center gap-3">
+            {saved && <span className="text-sm text-emerald-600 font-medium">Guardado ✓</span>}
+            {saveError && <span className="text-sm text-danger">{saveError}</span>}
+            <button
+              onClick={save}
+              disabled={busy}
+              className="px-5 py-2 bg-accent hover:bg-[#C2410C] text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
+            >
+              {busy ? "Guardando…" : "💾 Guardar cambios"}
+            </button>
+          </span>
         </div>
-      </div>
+    </div>
+  );
+}
 
+// Hoja del cliente compacta (panel derecho de Conversaciones)
+export function ClientSheet({ contact, onSaved, onSchedule, onDeleted, compact = false }) {
+  return (
+    <div className="space-y-6">
+      <div className={`doc-card ${compact ? "p-4" : "p-6"} space-y-4`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-lg text-slate-900">{contact.name || contact.wa_name || "Sin nombre"}</h2>
+            <p className="text-xs text-slate-500">
+              {contact.phone ? `+${contact.phone}` : "sin teléfono"}
+              {contact.doc_number && ` · ${contact.doc_type || "Doc"} ${contact.doc_number}`} · origen: {contact.source}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {contact.phone && (
+              <a
+                href={waLink(contact.phone)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-medium rounded-lg px-3 py-2 bg-whatsapp hover:bg-whatsapp-hover text-white"
+              >
+                WhatsApp
+              </a>
+            )}
+            <button onClick={() => onSchedule(contact)} className="btn-cta text-xs py-2 px-3">
+              Agendar
+            </button>
+          </div>
+        </div>
+        <LeadHistory contactId={contact.id} />
+        <ClientForm contact={contact} onSaved={onSaved} onDeleted={onDeleted} compact={compact} />
+      </div>
       <ContactPolicies contactId={contact.id} />
       <ContactSoat contactId={contact.id} />
+    </div>
+  );
+}
 
+const STATUS_BADGE = {
+  cliente: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  perdido: "bg-slate-100 text-slate-500 border-slate-200",
+};
+
+function TabIcon({ d }) {
+  return (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+
+// Ficha del cliente con pestañas (vista Clientes)
+function ClientDetail({ contact, onBack, onSaved, onSchedule, onDeleted }) {
+  const [tab, setTab] = useState("info");
+  const name = contact.name || contact.wa_name || "Sin nombre";
+  const tabs = [
+    ["info", "Información general", "M4 6h16v12H4zM8 10h4M8 14h8M16 10h0"],
+    ["vehiculos", "Vehículos & SOAT", "M5 16l1.5-5h11L19 16M5 16h14v3H5zM8 11l1.5-4h5L16 11", contact.soat_count],
+    ["polizas", "Pólizas", "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6", contact.policies_count],
+    ["chat", "Conversación", "M4 5h16v10H8l-4 4V5z", contact.unread_count],
+    ["historial", "Historial & notas", "M12 8v4l3 2M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"],
+    ["docs", "Documentos", "M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 8a4 4 0 0 1 0 8H7z"],
+  ];
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <header className="bg-surface border-b border-border px-4 sm:px-6 pt-5 shrink-0 shadow-sm">
+        <button onClick={onBack} className="md:hidden mb-2 text-sm text-slate-500 hover:text-accent">
+          ← Clientes
+        </button>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight truncate">{name}</h2>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                  contact.segment === "solo_soat"
+                    ? "bg-slate-100 text-slate-700 border-slate-200"
+                    : STATUS_BADGE[contact.status] || "bg-amber-50 text-amber-700 border-amber-200"
+                }`}
+              >
+                {contact.segment === "solo_soat" ? "Solo SOAT" : CONTACT_STATUS[contact.status] || contact.status}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
+              <span className="font-mono text-slate-600">📞 {contact.phone ? `+${contact.phone}` : "sin teléfono"}</span>
+              {contact.doc_number && (
+                <>
+                  <span>•</span>
+                  <span>
+                    {contact.doc_type || "Doc"} <strong className="text-slate-700 font-medium">{contact.doc_number}</strong>
+                  </span>
+                </>
+              )}
+              <span>•</span>
+              <span>
+                Origen: <strong className="text-slate-700 font-medium">{LEAD_SOURCE[contact.lead_source] || contact.source}</strong>
+              </span>
+              {contact.advisor && (
+                <>
+                  <span>•</span>
+                  <span>
+                    Asesor: <strong className="text-slate-700 font-medium">{contact.advisor}</strong>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {contact.phone && (
+              <a
+                href={waLink(contact.phone)}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-whatsapp hover:bg-whatsapp-hover text-white px-4 py-2.5 rounded-lg font-medium text-sm shadow-sm flex items-center gap-2 transition-colors"
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                  <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6-.4.4c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.6-.1 1.2z" />
+                </svg>
+                Abrir WhatsApp
+              </a>
+            )}
+            <button
+              onClick={() => onSchedule(contact)}
+              className="bg-accent hover:bg-[#C2410C] text-white px-4 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-colors"
+            >
+              📅 Agendar asesoría
+            </button>
+          </div>
+        </div>
+
+        <nav className="flex gap-6 mt-5 text-sm font-medium overflow-x-auto no-scrollbar">
+          {tabs.map(([k, v, d, n]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`shrink-0 pb-3 flex items-center gap-2 border-b-2 transition-colors ${
+                tab === k ? "text-accent border-accent" : "text-slate-500 border-transparent hover:text-slate-800"
+              }`}
+            >
+              <TabIcon d={d} />
+              {v}
+              {n > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-xs ${k === "chat" ? "bg-accent text-white" : "bg-slate-100 text-slate-600"}`}>
+                  {n}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <div className={`flex-1 min-h-0 ${tab === "chat" ? "flex flex-col" : "overflow-y-auto p-4 sm:p-6"}`}>
+        {tab === "info" && (
+          <div className="max-w-5xl bg-surface p-6 rounded-xl border border-border shadow-sm space-y-6 admin-rise">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <h3 className="text-base font-semibold text-slate-900">Datos personales y de contacto</h3>
+              {contact.updated_at && <span className="text-xs text-slate-400">Actualizado: {fmtDateTime(contact.updated_at)}</span>}
+            </div>
+            <ClientForm contact={contact} onSaved={onSaved} onDeleted={onDeleted} />
+          </div>
+        )}
+        {tab === "vehiculos" && (
+          <div className="max-w-5xl admin-rise">
+            <ContactSoat contactId={contact.id} />
+          </div>
+        )}
+        {tab === "polizas" && (
+          <div className="max-w-5xl admin-rise">
+            <ContactPolicies contactId={contact.id} />
+          </div>
+        )}
+        {tab === "chat" && <ChatThread contact={contact} onSaved={onSaved} fill />}
+        {tab === "historial" && (
+          <div className="max-w-5xl bg-surface p-6 rounded-xl border border-border shadow-sm space-y-4 admin-rise">
+            <h3 className="font-semibold text-slate-900">Bitácora de interacciones</h3>
+            <LeadHistory contactId={contact.id} empty="Sin interacciones registradas todavía." />
+            <div className="border-l-2 border-slate-200 pl-4 text-xs text-slate-600">
+              <span className="font-semibold text-slate-800">Cliente creado</span> · origen {contact.source}
+              <p className="text-[11px] text-slate-400">{contact.created_at ? fmtDateTime(contact.created_at) : ""}</p>
+            </div>
+            {contact.notes && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-slate-700 whitespace-pre-wrap">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 mb-1">Notas</p>
+                {contact.notes}
+              </div>
+            )}
+          </div>
+        )}
+        {tab === "docs" && (
+          <div className="max-w-5xl bg-surface rounded-xl border border-border shadow-sm text-center py-12 px-6 admin-rise">
+            <div className="text-4xl mb-3">☁️</div>
+            <h4 className="text-sm font-semibold text-slate-700">Carpeta del cliente en OneDrive</h4>
+            {contact.onedrive_folder ? (
+              <>
+                <p className="text-xs text-slate-500 mt-1 mb-4 font-mono">{contact.onedrive_folder}</p>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(contact.onedrive_folder)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium"
+                >
+                  📋 Copiar ruta
+                </button>
+              </>
+            ) : (
+              <p className="text-xs text-slate-400 mt-1">
+                Sin carpeta asignada. Agrégala en <button onClick={() => setTab("info")} className="text-accent underline">Información general</button>.
+              </p>
+            )}
+            <p className="text-xs text-slate-400 mt-6">Los PDF de cada póliza se abren desde la pestaña Pólizas.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -710,16 +973,6 @@ export function ChatThread({ contact, onSaved, fill = false, header = null }) {
         />
         </div>
       </div>
-  );
-}
-
-// Hoja del cliente + conversación, una debajo de la otra (vista Clientes)
-function ContactDetail(props) {
-  return (
-    <div className="space-y-6">
-      <ClientSheet {...props} />
-      <ChatThread contact={props.contact} onSaved={props.onSaved} />
-    </div>
   );
 }
 
@@ -842,17 +1095,17 @@ function ReplyBox({ contactId, messages, onSent }) {
   );
 }
 
-function LeadHistory({ contactId }) {
+function LeadHistory({ contactId, empty = null }) {
   const [leads, setLeads] = useState([]);
   useEffect(() => {
     getLeads(contactId).then(setLeads).catch(() => {});
   }, [contactId]);
-  if (!leads.length) return null;
+  if (!leads.length) return empty ? <p className="text-xs text-slate-400">{empty}</p> : null;
   return (
-    <div className="text-xs font-mono text-muted space-y-1 border-l-2 border-accent pl-3">
+    <div className="text-xs text-slate-600 space-y-3 border-l-2 border-slate-200 pl-4">
       {leads.map((l) => (
         <div key={l.id}>
-          <span className="text-foreground">{LEAD_SOURCE[l.source] || l.source}</span>
+          <span className="font-semibold text-slate-800">{LEAD_SOURCE[l.source] || l.source}</span>
           {l.detail && ` · ${l.detail}`}
           {l.interest && ` · ${TOPICS[l.interest] || l.interest}`} · {fmtDateTime(l.created_at)}
           {l.first_message && <div className="italic truncate">“{l.first_message}”</div>}
